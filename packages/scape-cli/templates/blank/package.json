@@ -1,0 +1,20 @@
+{
+  "name": "my-scape-project",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "scape gizmo dev"
+  },
+  "dependencies": {
+    "@scape-wtf/sdk": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@scape-wtf/cli": "0.1.0"
+  },
+  "scape": {
+    "entry": "src/project.ts"
+  }
+}

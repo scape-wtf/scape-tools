@@ -1,0 +1,106 @@
+{
+  "name": "@scape-wtf/agent-mcp",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "description": "Provider-independent MCP tools for connecting an owner-run agent to Scape",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scape-wtf/scape-tools.git",
+    "directory": "packages/scape-agent-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/scape-wtf/scape-tools/issues"
+  },
+  "homepage": "https://github.com/scape-wtf/scape-tools/tree/main/packages/scape-agent-mcp#readme",
+  "exports": {
+    ".": "./server.mjs",
+    "./cli": "./cli.mjs",
+    "./runner": {
+      "types": "./runner.d.mts",
+      "import": "./runner.mjs"
+    },
+    "./runtime": {
+      "types": "./runtime.d.mts",
+      "import": "./runtime.mjs"
+    },
+    "./contracts": {
+      "types": "./contracts.d.mts",
+      "import": "./contracts.mjs"
+    },
+    "./providers": "./providers.mjs",
+    "./behavior": {
+      "types": "./world-behavior.d.mts",
+      "import": "./world-behavior.mjs"
+    },
+    "./presence": {
+      "types": "./presence.d.mts",
+      "import": "./presence.mjs"
+    },
+    "./decision": {
+      "types": "./decision.d.mts",
+      "import": "./decision.mjs"
+    },
+    "./memory": {
+      "types": "./encounters.d.mts",
+      "import": "./encounters.mjs"
+    }
+  },
+  "bin": {
+    "scape-agent-mcp": "cli.mjs",
+    "scape-agent": "diagnostics.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "bridge.mjs",
+    "cli.mjs",
+    "README.md",
+    "assets.mjs",
+    "transport.mjs",
+    "transport.d.mts",
+    "diagnostics.mjs",
+    "contracts.mjs",
+    "contracts.d.mts",
+    "runtime.mjs",
+    "runtime.d.mts",
+    "runner.mjs",
+    "runner-config.mjs",
+    "model-policy.mjs",
+    "policy-loader.mjs",
+    "transport.md",
+    "providers.mjs",
+    "provider-http.mjs",
+    "world-behavior.mjs",
+    "presence.mjs",
+    "runner.d.mts",
+    "world-behavior.d.mts",
+    "presence.d.mts",
+    "decision.mjs",
+    "decision.d.mts",
+    "decision-config.mjs",
+    "social-decisions.mjs",
+    "world-goals.mjs",
+    "encounters.mjs",
+    "encounters.d.mts"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.0",
+    "@modelcontextprotocol/server": "2.3.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "generate:contracts": "node ../../tools/dev/agent-contracts.mjs",
+    "check:contracts": "node ../../tools/dev/agent-contracts.mjs --check",
+    "prepack": "node ../../tools/dev/agent-contracts.mjs"
+  }
+}

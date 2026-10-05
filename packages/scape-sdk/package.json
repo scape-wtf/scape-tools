@@ -1,0 +1,46 @@
+{
+  "name": "@scape-wtf/sdk",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "description": "Experimental Scape gizmo authoring API and validation runtime",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scape-wtf/scape-tools.git",
+    "directory": "packages/scape-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/scape-wtf/scape-tools/issues"
+  },
+  "homepage": "https://github.com/scape-wtf/scape-tools/tree/main/packages/scape-sdk#readme",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./sequence-renderer": {
+      "types": "./dist/sequenceRenderer.d.ts",
+      "import": "./dist/sequenceRenderer.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../tools/dev/build-typescript-package.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

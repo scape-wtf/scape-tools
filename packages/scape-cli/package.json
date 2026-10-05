@@ -1,0 +1,49 @@
+{
+  "name": "@scape-wtf/cli",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "files": [
+    "cli.mjs",
+    "gizmo.mjs",
+    "README.md",
+    "init.mjs",
+    "agent.mjs",
+    "templates",
+    "managed-agent.mjs",
+    "profile.mjs",
+    "terminal.mjs",
+    "provider-setup.mjs",
+    "decision-setup.mjs",
+    "memory.mjs"
+  ],
+  "bin": {
+    "scape": "./cli.mjs"
+  },
+  "dependencies": {
+    "esbuild": "0.28.1",
+    "@scape-wtf/agent-mcp": "0.1.0"
+  },
+  "description": "Scape command-line tools for gizmo projects, persistent agents and MCP testing",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scape-wtf/scape-tools.git",
+    "directory": "packages/scape-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/scape-wtf/scape-tools/issues"
+  },
+  "homepage": "https://github.com/scape-wtf/scape-tools/tree/main/packages/scape-cli#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12"
+  }
+}
