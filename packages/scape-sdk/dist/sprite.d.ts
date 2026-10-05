@@ -1,9 +1,11 @@
 import { type ObjectDefinition } from './api.js';
+/** Solid color or vertical gradient used by a sprite layer. */
 export type GizmoSpriteFill = string | {
     from: string;
     to: string;
     y: [number, number];
 };
+/** Bounded primitive shape available to a host-rendered sprite layer. */
 export type GizmoSpriteShape = {
     kind: 'rect';
     x: number;
@@ -37,6 +39,7 @@ export interface GizmoSpriteRecipe {
         shapes: GizmoSpriteShape[];
     }[];
 }
+/** One frame of a local sprite-layer animation. */
 export interface GizmoSpriteFrame {
     at: number;
     offset: [number, number];

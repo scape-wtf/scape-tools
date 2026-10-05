@@ -11,4 +11,4 @@ worlds or floors or move someone else.
 
 Run `npm run build`, `npm test`, or `npm run dev` here.
 The example is included in every developer-world sidebar and palette.
-Export it with `yarn sdk:starter /absolute/path/jump-pad --template jump-pad`.
+Export it with `npm exec -- scape gizmo init /absolute/path/jump-pad --template jump-pad`.

@@ -29,7 +29,7 @@ tap outside closes the popover. Scape supplies this shared UI from the actions'
 To edit its source independently, export a standalone project from the repository:
 
 ```sh
-yarn sdk:starter /absolute/path/my-lamp --template lamp
+npm exec -- scape gizmo init /absolute/path/my-lamp --template lamp
 ```
 
 In that new directory, run `npm install`, `npm test`, then

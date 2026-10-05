@@ -5,7 +5,10 @@ export class ObjectActionError extends Error {
         this.status = status;
     }
 }
-export const record = (value) => !!value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+export const record = (value) => !!value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype;
 export const exactKeys = (value, keys) => Object.keys(value).every(key => keys.includes(key));
 export const actorId = (value) => typeof value === 'string' && /^[a-z0-9-]{1,80}$/i.test(value);
 export const objectId = (value) => typeof value === 'string' && /^[a-z0-9-]{16,80}$/i.test(value);
@@ -38,7 +41,9 @@ export function localObjectRandomInt(min, max) {
     do {
         crypto.getRandomValues(value);
     } while (value[0] >= limit);
-    return min + value[0] % range;
+    return min + (value[0] % range);
 }
 export const PROJECT_OBJECT_LIMIT = 16;
-export function defineProject(project) { return project; }
+export function defineProject(project) {
+    return project;
+}

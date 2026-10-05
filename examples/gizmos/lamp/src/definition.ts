@@ -59,7 +59,7 @@ export const lamp = defineObject<LampState>({
         pressed: state.on,
         action: { name: 'toggle', payload: {} },
       },
-      ...Object.keys(colors).map((color) => ({
+      ...Object.keys(colors).map(color => ({
         id: color,
         label: color[0].toUpperCase() + color.slice(1),
         pressed: state.color === color,
@@ -69,7 +69,7 @@ export const lamp = defineObject<LampState>({
     ],
   }),
   // Missing effects mean off. This runs on state changes, never once per frame.
-  lighting: (state) =>
+  lighting: state =>
     state.on
       ? {
           light: {

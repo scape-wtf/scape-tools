@@ -12,7 +12,7 @@ shared state, identity, permissions and popover UI; the example imports only
 After installing root dependencies and running `npm run build:gizmos`, run
 `npm run build` and `npm test` here. Use
 `npm run dev` to pair edits.
-Export with `yarn sdk:starter /absolute/path/my-counter --template counter` at
+Export with `npm exec -- scape gizmo init /absolute/path/my-counter --template counter` at
 the repository root, then install and test inside the exported project.
 
 Tests cover participant increments, editor-only reset and the upper bound.

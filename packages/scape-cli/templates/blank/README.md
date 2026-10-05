@@ -7,7 +7,7 @@ Run `npm install`, then `npm run build` to check your definition. Connect with
 `npm run dev` to connect to your Scape developer world at https://scape.wtf. Use `--origin` only for another host.
 That script runs `scape gizmo dev`; the public CLI is already included in the generated project.
 Open the printed link, sign in, and approve the matching connection code in your
-private developer world. Select **My gizmo** in the developer sidebar or the
+hosted Scape developer world. Select **My gizmo** in the developer sidebar or the
 placement palette, place it, and open it. Saving source changes updates the preview.
 
 `src/project.ts` is the project entry and collects your gizmos. Start in `src/definition.ts`. The starter has empty state and no actions: choose
@@ -59,4 +59,4 @@ replace the command with Yarn, whose output can interfere with stdio MCP. Your h
 supplies the agent model and decision loop. Agent approval in Settings → Developer → Agents is
 separate from this project's Gizmo upload grant. The canonical direct server command
 is `scape agent mcp serve`; it starts the MCP server,
-not a model. Run `yarn scape --help` for the command summary.
+not a model. Run `scape --help` for the command summary.

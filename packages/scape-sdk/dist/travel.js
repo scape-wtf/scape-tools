@@ -5,17 +5,27 @@ export const validGizmoLink = (value) => record(value) && exactKeys(value, ['siz
 export function gizmoTravelError(value, definition, state) {
     if (value === null)
         return null;
-    if (!record(value) || !exactKeys(value, ['destination', 'exits', 'relative', 'cooldownMs', 'feedback', 'arrival']) || !jsonData(value))
+    if (!record(value) ||
+        !exactKeys(value, ['destination', 'exits', 'relative', 'cooldownMs', 'feedback', 'arrival']) ||
+        !jsonData(value))
         return 'Invalid travel recipe';
     const d = value.destination;
-    if (!record(d) || !(d.kind === 'linked' && exactKeys(d, ['kind']) && definition.link
-        || d.kind === 'offset' && exactKeys(d, ['kind', 'x', 'y']) && [d.x, d.y].every(v => Number.isInteger(v) && Math.abs(Number(v)) <= 64)))
+    if (!record(d) ||
+        !((d.kind === 'linked' && exactKeys(d, ['kind']) && definition.link) ||
+            (d.kind === 'offset' &&
+                exactKeys(d, ['kind', 'x', 'y']) &&
+                [d.x, d.y].every(v => Number.isInteger(v) && Math.abs(Number(v)) <= 64))))
         return 'Travel requires a declared link or a bounded offset destination';
-    if (!Array.isArray(value.exits) || value.exits.length < 1 || value.exits.length > 9 || value.exits.some(p => !Array.isArray(p) || p.length !== 2 || p.some(n => !Number.isInteger(n) || Math.abs(n) > 1)))
+    if (!Array.isArray(value.exits) ||
+        value.exits.length < 1 ||
+        value.exits.length > 9 ||
+        value.exits.some(p => !Array.isArray(p) || p.length !== 2 || p.some(n => !Number.isInteger(n) || Math.abs(n) > 1)))
         return 'Travel requires 1–9 adjacent landing offsets';
     if (value.relative !== undefined && typeof value.relative !== 'boolean')
         return 'Invalid travel orientation';
-    if (!Number.isInteger(value.cooldownMs) || Number(value.cooldownMs) < 650 || Number(value.cooldownMs) > 5000)
+    if (!Number.isInteger(value.cooldownMs) ||
+        Number(value.cooldownMs) < 650 ||
+        Number(value.cooldownMs) > 5000)
         return 'Travel cooldown must be 650–5000 ms';
     if (value.feedback !== undefined) {
         if (!record(value.feedback) || !exactKeys(value.feedback, ['durationMs', 'audio', 'haptic']))
@@ -26,11 +36,23 @@ export function gizmoTravelError(value, definition, state) {
     }
     if (value.arrival !== undefined) {
         const a = value.arrival;
-        if (!record(a) || !exactKeys(a, ['durationMs', 'scale', 'trail']) || typeof a.durationMs !== 'number' || a.durationMs < 1 || a.durationMs > 2000
-            || typeof a.scale !== 'number' || a.scale < .1 || a.scale > 1)
+        if (!record(a) ||
+            !exactKeys(a, ['durationMs', 'scale', 'trail']) ||
+            typeof a.durationMs !== 'number' ||
+            a.durationMs < 1 ||
+            a.durationMs > 2000 ||
+            typeof a.scale !== 'number' ||
+            a.scale < 0.1 ||
+            a.scale > 1)
             return 'Invalid arrival animation';
-        if (a.trail !== undefined && (!record(a.trail) || !exactKeys(a.trail, ['color', 'opacity']) || typeof a.trail.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(a.trail.color)
-            || typeof a.trail.opacity !== 'number' || a.trail.opacity < 0 || a.trail.opacity > 1))
+        if (a.trail !== undefined &&
+            (!record(a.trail) ||
+                !exactKeys(a.trail, ['color', 'opacity']) ||
+                typeof a.trail.color !== 'string' ||
+                !/^#[0-9a-f]{6}$/i.test(a.trail.color) ||
+                typeof a.trail.opacity !== 'number' ||
+                a.trail.opacity < 0 ||
+                a.trail.opacity > 1))
             return 'Invalid arrival trail';
     }
     return null;

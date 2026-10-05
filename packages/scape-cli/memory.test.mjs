@@ -1,24 +1,54 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,readFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {openEncounterMemory} from '@scape-wtf/agent-mcp/memory';
-import {parseAgentConfig} from '@scape-wtf/agent-mcp/runner';
-import {saveProfile,readProfile,lockProfile} from './profile.mjs';
-import {memoryCommand} from './memory.mjs';
-test('memory CLI lists opaque encounters, forgets, clears and toggles without entering a world',async t=>{
- const directory=await mkdtemp(path.join(tmpdir(),'scape-memory-cli-'));t.after(()=>rm(directory,{recursive:true,force:true}));
- await saveProfile(directory,{version:1,origin:'https://example.test',config:parseAgentConfig({name:'Scout',provider:{type:'ollama',model:'fixture'}})});
- const store=await openEncounterMemory({directory});store.scope({origin:'https://example.test',room:'world',agent:'Scout'}).greet('a'.repeat(64));const id=store.list()[0].id;await store.close();
- const lines=[],ui={heading(){},line:s=>lines.push(s),success:s=>lines.push(s),close(){}};
- await memoryCommand(['list'],{directory,ui});assert.ok(lines.join('\n').includes(id));
- await memoryCommand(['disable'],{directory,ui});assert.equal((await readProfile(directory)).config.memory.enabled,false);
- assert.ok((await readFile(path.join(directory,'encounters.json'),'utf8')).includes('a'.repeat(64)));
- await memoryCommand(['enable'],{directory,ui});assert.equal((await readProfile(directory)).config.memory.enabled,true);
- const profile=await readProfile(directory);await saveProfile(directory,{...profile,config:parseAgentConfig({...profile.config,behavior:{...profile.config.behavior,enabled:false}})});
- lines.length=0;await memoryCommand(['list'],{directory,ui});assert.ok(lines.some(line=>line.startsWith('Temporary only')));
- const release=await lockProfile(directory);await assert.rejects(memoryCommand(['clear'],{directory,ui}),/already running/);await release();
- await memoryCommand(['forget',id],{directory,ui});await memoryCommand(['clear'],{directory,ui});
- const reader=await openEncounterMemory({directory,readOnly:true});assert.deepEqual(reader.list(),[]);await reader.close();
+import { openEncounterMemory } from '@scape-wtf/agent-mcp/memory';
+import { parseAgentConfig } from '@scape-wtf/agent-mcp/runner';
+import { saveProfile, readProfile, lockProfile } from './profile.mjs';
+import { memoryCommand } from './memory.mjs';
+test('memory CLI lists opaque encounters, forgets, clears and toggles without entering a world', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'scape-memory-cli-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await saveProfile(directory, {
+    version: 1,
+    origin: 'https://example.test',
+    config: parseAgentConfig({ name: 'Scout', provider: { type: 'ollama', model: 'fixture' } }),
+  });
+  const store = await openEncounterMemory({ directory });
+  store
+    .scope({ origin: 'https://example.test', room: 'world', agent: 'Scout' })
+    .greet('a'.repeat(64));
+  const id = store.list()[0].id;
+  await store.close();
+  const lines = [],
+    ui = { heading() {}, line: s => lines.push(s), success: s => lines.push(s), close() {} };
+  await memoryCommand(['list'], { directory, ui });
+  assert.ok(lines.join('\n').includes(id));
+  await memoryCommand(['disable'], { directory, ui });
+  assert.equal((await readProfile(directory)).config.memory.enabled, false);
+  assert.ok(
+    (await readFile(path.join(directory, 'encounters.json'), 'utf8')).includes('a'.repeat(64)),
+  );
+  await memoryCommand(['enable'], { directory, ui });
+  assert.equal((await readProfile(directory)).config.memory.enabled, true);
+  const profile = await readProfile(directory);
+  await saveProfile(directory, {
+    ...profile,
+    config: parseAgentConfig({
+      ...profile.config,
+      behavior: { ...profile.config.behavior, enabled: false },
+    }),
+  });
+  lines.length = 0;
+  await memoryCommand(['list'], { directory, ui });
+  assert.ok(lines.some(line => line.startsWith('Temporary only')));
+  const release = await lockProfile(directory);
+  await assert.rejects(memoryCommand(['clear'], { directory, ui }), /already running/);
+  await release();
+  await memoryCommand(['forget', id], { directory, ui });
+  await memoryCommand(['clear'], { directory, ui });
+  const reader = await openEncounterMemory({ directory, readOnly: true });
+  assert.deepEqual(reader.list(), []);
+  await reader.close();
 });

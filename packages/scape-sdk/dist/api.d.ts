@@ -15,38 +15,64 @@ import type { GizmoTextEditor } from './text.js';
 import type { GizmoPresentation, GizmoTimeline } from './presentation.js';
 /** Experimental Scape object authoring contract. Execution isolation is supplied by the host, not this authoring API. */
 export interface ObjectInstance {
+    /** Stable identity assigned by the host for one placed instance. */
     id: string;
+    /** Namespaced definition type that created this instance. */
     type: string;
+    /** Definition version used to validate the saved state. */
     version: number;
+    /** Author-owned state returned by the definition's `initial` and actions. */
     state: unknown;
+    /** Optional host-managed link identity for grouped world behavior. */
     linkId?: string;
 }
 /** Portable editor values only; identities and live state never cross placements. */
 export interface ObjectConfiguration {
+    /** Definition type whose configuration is being stored. */
     type: string;
+    /** Definition version that established the configuration shape. */
     version: number;
+    /** Declared editor values; never include identity, credentials, or live state. */
     values: Record<string, unknown>;
 }
+/** Identity and editing authority visible to a view callback. */
 export interface ObjectViewer {
+    /** Host-issued actor identifier for the viewer. */
     actorId: string;
+    /** Whether the viewer may invoke editor-permission actions. */
     canEdit: boolean;
 }
+/** Authority, clock, and bounded randomness supplied to an authoritative action. */
 export interface ObjectContext extends ObjectViewer {
+    /** Whether this actor may remove the placed instance. */
     canRemove?: boolean;
+    /** Host time in milliseconds; do not use a process clock for game decisions. */
     now: number;
+    /** Host-provided inclusive random integer source. */
     randomInt: (min: number, max: number) => number;
 }
+/** Name and JSON payload submitted to a definition action. */
 export interface ObjectAction {
+    /** Action key declared in the definition. */
     name: string;
+    /** JSON-compatible action input, validated by the host before execution. */
     payload: Record<string, unknown>;
 }
+/** A participant/editor control rendered by Scape's shared configuration UI. */
 export interface ObjectControl {
+    /** Stable control identifier used by the host for focus and drafts. */
     id: string;
+    /** Accessible button label and tooltip. */
     label: string;
+    /** Action invoked when the control is submitted. */
     action: ObjectAction;
+    /** Disables submission without changing the action's permission. */
     disabled?: boolean;
+    /** Current state for a toggle control. */
     pressed?: boolean;
+    /** Confirmation message shown before a destructive action. */
     confirm?: string;
+    /** Editor field identifiers submitted with this control. */
     fields?: string[];
     /** Host action-row switch for a participant action without fields; requires boolean pressed state. */
     icon?: 'toggle';
@@ -61,9 +87,12 @@ export interface ObjectControl {
 }
 /** A finite choice is author data; the host never interprets its value as a game feature. */
 export interface ObjectChoice {
+    /** Stable submitted value. */
     value: string;
+    /** Human-readable label shown in the control. */
     label: string;
 }
+/** One bounded text or select editor field in an object view. */
 export type ObjectField = {
     id: string;
     label: string;
@@ -77,20 +106,34 @@ export type ObjectField = {
     kind: 'select';
     options: ObjectChoice[];
 };
+/** Declarative editor content rendered inside Scape's shared popover. */
 export interface ObjectView {
+    /** Visible panel title. */
     title: string;
+    /** Supporting description for the current state or controls. */
     description: string;
+    /** Optional editable fields. */
     fields?: ObjectField[];
+    /** Actions available to the current viewer. */
     controls: ObjectControl[];
 }
+/** Complete author-owned contract for one versioned Scape gizmo type. */
 export interface ObjectDefinition {
+    /** Namespaced, stable identifier for this definition. */
     type: string;
+    /** Increment when saved state or behavior becomes incompatible. */
     version: number;
+    /** Unique emoji identity used by the host catalog. */
     emoji: string;
+    /** Short human-readable name shown in the developer and world UI. */
     label: string;
+    /** Concise hint shown beside the gizmo in catalogs. */
     hint: string;
+    /** Creates fresh state for a placement. Must not read external state. */
     initial: () => unknown;
+    /** Returns true only for valid state for this definition version. */
     valid: (state: unknown) => boolean;
+    /** Authoritative actions keyed by the names used in `ObjectControl.action`. */
     actions: Record<string, {
         permission: 'participant' | 'editor' | 'remover';
         run: (state: unknown, payload: Record<string, unknown>, context: ObjectContext) => unknown;

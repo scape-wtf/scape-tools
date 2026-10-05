@@ -1,32 +1,104 @@
 /** Canonical external agent contract. Keep this module independent of host packages. */
+/** Maximum display-name length accepted by the external agent gateway. */
 export const AGENT_NAME_MAX_LENGTH = 24;
+/** A bounded object visible to an admitted agent. Coordinates are room-local. */
 export interface AgentSceneObject {
-  id?: string; x: number; y: number; emoji: string; floor?: 0 | 1; isEntry?: boolean;
-  message?: string; targetRoomName?: string; linkedRoom?: boolean; portalPairId?: string;
-  radioConfigured?: boolean; conveyorEmoji?: '➡️' | '⬇️' | '⬅️' | '⬆️';
-  pianoNote?: string; pianoSound?: string;
+  /** Optional stable object identifier for interaction targets. */
+  id?: string;
+  /** Horizontal room coordinate. */
+  x: number;
+  /** Vertical room coordinate. */
+  y: number;
+  /** Public object emoji. */
+  emoji: string;
+  /** Floor containing the object. */
+  floor?: 0 | 1;
+  /** Whether this object marks an entry point. */
+  isEntry?: boolean;
+  /** Bounded text displayed by a sign or world object. */
+  message?: string;
+  /** Public destination label for a linked room. */
+  targetRoomName?: string;
+  /** Whether the object is connected to another room. */
+  linkedRoom?: boolean;
+  /** Public portal-pair identifier when applicable. */
+  portalPairId?: string;
+  /** Whether a radio interaction is configured. */
+  radioConfigured?: boolean;
+  /** Direction of a conveyor object. */
+  conveyorEmoji?: '➡️' | '⬇️' | '⬅️' | '⬆️';
+  /** Piano note label, when exposed by the room catalog. */
+  pianoNote?: string;
+  /** Public piano sound identifier. */
+  pianoSound?: string;
 }
+/** Bounded scene summary supplied to an agent; it is not raw room state. */
 export interface AgentScene {
-  blocked: number[]; objects: AgentSceneObject[]; floor?: 0 | 1; hasBasement?: boolean;
-  editing?: 'everyone' | 'owner'; gameFacts?: { gemsEnabled: boolean; gemRefundHours: number };
+  /** Blocked cell indexes for the active floor. */
+  blocked: number[];
+  /** Public objects visible to the agent. */
+  objects: AgentSceneObject[];
+  /** Active floor. */
+  floor?: 0 | 1;
+  /** Whether the room exposes a basement floor. */
+  hasBasement?: boolean;
+  /** Current editing policy for the room. */
+  editing?: 'everyone' | 'owner';
+  /** Bounded public game facts relevant to agent behavior. */
+  gameFacts?: { gemsEnabled: boolean; gemRefundHours: number };
 }
 /** Version 1 of the external agent gateway. No account IDs, credentials or raw scene state. */
-export interface AgentPosition { x: number; y: number; floor: 0 | 1 }
-export interface AgentMovement {
-  id: string; target: AgentPosition; status: 'moving' | 'arrived' | 'stopped' | 'blocked' | 'timed_out' | 'disconnected';
+/** A room-local grid position. */
+export interface AgentPosition {
+  x: number;
+  y: number;
+  floor: 0 | 1;
 }
-export interface AgentPursuit {id:string;player:string;mode:'follow'|'approach';status:'moving'|'holding'|'arrived'|'stopped'|'lost'|'blocked'|'timed_out';expiresAt:number}
+/** Lifecycle of one host-authorized movement request. */
+export interface AgentMovement {
+  id: string;
+  target: AgentPosition;
+  status: 'moving' | 'arrived' | 'stopped' | 'blocked' | 'timed_out' | 'disconnected';
+}
+/** State of a bounded follow or approach request targeting one player. */
+export interface AgentPursuit {
+  id: string;
+  player: string;
+  mode: 'follow' | 'approach';
+  status: 'moving' | 'holding' | 'arrived' | 'stopped' | 'lost' | 'blocked' | 'timed_out';
+  expiresAt: number;
+}
+/** Snapshot delivered by the external agent gateway. */
 export interface AgentObservation {
-  protocol: 1; sessionId: string; revision: number; observedAt: number; room: string; status: string;
+  protocol: 1;
+  sessionId: string;
+  revision: number;
+  observedAt: number;
+  room: string;
+  status: string;
   self: (AgentPosition & { id: string; name: string; text: string }) | null;
-  players: Array<AgentPosition & { id: string; name: string; text: string; textRevision: number; settled: boolean }>;
+  players: Array<
+    AgentPosition & {
+      id: string;
+      name: string;
+      text: string;
+      textRevision: number;
+      settled: boolean;
+    }
+  >;
   objects: Array<AgentPosition & { emoji: string; text?: string }>;
   blocked: Array<{ x: number; y: number }>;
   movement: AgentMovement | null;
   scene?: AgentScene;
-  roster?: Array<AgentPosition & {id:string;name:string;encounterKey?:string}>;
+  roster?: Array<AgentPosition & { id: string; name: string; encounterKey?: string }>;
   interacting?: boolean;
-  pursuit?:AgentPursuit|null;
-  appearance?: {kind:string;emoji:string;model:string|null;expression?:string;expressions?:string[]};
+  pursuit?: AgentPursuit | null;
+  appearance?: {
+    kind: string;
+    emoji: string;
+    model: string | null;
+    expression?: string;
+    expressions?: string[];
+  };
   limits: { radius: number; heartbeatMs: number; idleTimeoutMs: number; maxSpeechLength: number };
 }

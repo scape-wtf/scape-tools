@@ -40,11 +40,11 @@ test('direction choices use the public select/autosave contract with no host-spe
   const state = fan.initial(),
     view = fan.view(state, { actorId: 'owner', canEdit: true });
   const field = view.fields[0],
-    control = view.controls.find((control) => control.id === 'direction');
+    control = view.controls.find(control => control.id === 'direction');
   assert.equal(field.kind, 'select');
   assert.equal(field.value, 'right');
   assert.deepEqual(
-    field.options.map((option) => option.value),
+    field.options.map(option => option.value),
     ['right', 'down', 'left', 'up'],
   );
   assert.equal(control.trigger, 'change');
@@ -52,7 +52,7 @@ test('direction choices use the public select/autosave contract with no host-spe
   assert.equal(
     fan
       .view(state, { actorId: 'visitor', canEdit: false })
-      .controls.find((control) => control.id === 'direction').disabled,
+      .controls.find(control => control.id === 'direction').disabled,
     true,
   );
 });

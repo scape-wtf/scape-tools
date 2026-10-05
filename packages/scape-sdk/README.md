@@ -80,11 +80,13 @@ Reducers must be synchronous and free of side effects. This runtime validates da
 and permissions, but does not isolate code or bound its execution time.
 
 The SDK contains no renderer, game distribution, credentials, world connection, upload
-client, private storage, live-media/gem APIs, or version migration machinery. The separate `@scape-wtf/cli` tool can connect a local project to its private developer world;
+client, private storage, live-media/gem APIs, or version migration machinery. The separate `@scape-wtf/cli` tool can connect a local project to its hosted Scape developer world;
 Scape uses its separate restricted runtime for uploaded gizmo definitions.
 The unified CLI uses `scape gizmo init` and `scape gizmo dev`; `scape init` and
 `scape dev` remain aliases. It also configures/serves MCP through `scape agent mcp`,
 without giving agents Gizmo upload grants or supplying an agent model.
+
+## Contributor/source-workspace kit
 
 Export the initial kit from source with `yarn sdk:starter <new-directory>`. It contains
 `scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz`. Keep these
@@ -105,10 +107,10 @@ installation, game build, development start and typecheck build it automatically
 with packed copies of this SDK and the development command. The destination's parent directory must already exist.
 Use `--template voting-booth` for the optional worked example. The blank project has empty
 state and no actions; `src/project.ts` collects definitions to register in your private
-world. See the [developer guide](../../docs/developer-playground.md) for reserved names/emojis, connection approval and compatibility rules. Public packages are available from npm; the source workspace remains canonical.
+world. See the [developer guide](https://developer.scape.wtf/gizmos/quickstart) for reserved names/emojis, connection approval and compatibility rules. Public packages are available from npm; the source workspace remains canonical.
 
 Gizmos can also declare models, animation, interaction and independent audio through the experimental
-[presentation contract](../../docs/gizmo-presentation.md). The SDK contains the JSON types,
+[presentation contract](https://developer.scape.wtf/gizmos/presentation). The SDK contains the JSON types,
 validation, quaternion helpers and shared procedural sound rendering; platform rendering/output stays in Scape.
 
 Text gizmos can declare `worldText(state)`, `textEditor` and `editPolicy`. The host
@@ -159,7 +161,7 @@ player volume regardless of authored sound or lighting choices.
 `lighting(state)` can replace fixed `light`/`glow` recipes with a complete result
 for each accepted state; return `{}` to turn both off. Scape validates every result
 and caches it outside the frame loop. The optional bounded `light.pattern` adds
-palette-based scattered masks. See the [lighting contract](../../docs/gizmo-presentation.md#state-driven-lighting)
+palette-based scattered masks. See the [lighting contract](https://developer.scape.wtf/gizmos/presentation#state-driven-lighting)
 and [standalone lamp](../../gizmos/examples/lamp/README.md). Export the lamp using
 `yarn sdk:starter /absolute/new/directory --template lamp`.
 

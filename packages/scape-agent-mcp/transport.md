@@ -1,4 +1,6 @@
-# Scape Agent API — internal HTTP transport
+# Scape Agent API — advanced transport reference
+
+> This document describes an implementation detail used by the Scape MCP server. It is not a stable public HTTP API. For supported integrations, install the package and use `scape agent mcp config` or the public MCP server entry point.
 
 The Scape MCP package owns the internal HTTP client and manual diagnostics. The
 transport itself has no runtime dependencies, wallet integration or hosted inference.
@@ -16,7 +18,7 @@ Use the existing development server with its room Worker configured. Restart tha
 server after backend changes; the CLI does not start a server or read `.env`.
 
 ```sh
-yarn agent https://your-scape-host "Scout"
+scape-agent https://scape.wtf "Scout"
 ```
 
 The repository `yarn agent` command runs this package's `diagnostics.mjs`. The
@@ -44,7 +46,7 @@ Agents use a separate identity and may bring an emoji, image or static GLB throu
 MCP avatar tools, with a robot fallback and a server-assigned
 `· AI` name suffix. They count against ordinary room capacity and cannot edit,
 moderate, access wallets or use the owner's account session. Approval currently
-permits only a world owned by that account, including its private developer world.
+permits only a world owned by that account, including its hosted Scape developer world.
 Agent visits do not renew developer-world retention. One agent per owner and at
 most 20 active gateway controllers are supported in this alpha.
 
@@ -60,14 +62,19 @@ package consumers; custom agents should use MCP instead.
 import { ScapeAgent } from './packages/scape-agent-mcp/transport.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const agent = new ScapeAgent({ origin: 'https://your-scape-server' });
+const agent = new ScapeAgent({ origin: 'https://scape.wtf' });
 const { code } = await agent.pair('Scout');
 console.log('Approve this code in Settings → Developer → Agents:', code);
 while (!(await agent.pairingStatus()).approved) await delay(2000);
 
 await agent.enter();
 let latest;
-agent.watch(observation => { latest = observation; }, error => console.error(error.message));
+agent.watch(
+  observation => {
+    latest = observation;
+  },
+  error => console.error(error.message),
+);
 try {
   while (latest?.status !== 'connected' || !latest.self) await delay(100);
   await agent.speak('Hello from my runner');
@@ -124,24 +131,24 @@ context and logs. Only loopback HTTP is accepted by the client. The client omits
 cookies, rejects redirects, applies a ten-second request timeout and does not
 retry commands automatically.
 
-| Endpoint under `/api/agents/` | Body / result |
-| --- | --- |
-| `link/start` | `{name}` → `{code, secret, expiresAt}`; no bearer required |
-| `link/poll` | `{}` with the returned secret as bearer → pending or approved grant |
-| `enter` | `{}` → observation; concurrent/retried entry shares one session |
-| `observe` | `{sessionId}` → observation |
-| `speak` | `{sessionId,id,text}` → `{ok:true}` |
-| `move-to` | `{sessionId,id,x,y,floor}` → `{operationId}` |
-| `step` | `{sessionId,id,x,y,floor}` → `{operationId}`; adjacent same-floor step |
-| `interact` | `{sessionId,id,target}` → `{ok:true}`; observed object ID |
-| `expression` | `{sessionId,id,expression}` → `{ok:true}` |
-| `follow`, `approach` | `{sessionId,id,player}` → `{operationId}`; observed roster ID |
-| `avatar` | `{kind,emoji?,data?,preset?,expression?}` → appearance summary; `data` is base64 for image/GLB uploads |
-| `world-status` | `{}` → `{potentialParticipants}`; does not require entry |
-| `guide` | `{query?}` → handbook topics or matches; does not require entry |
-| `avatar-catalog` | `{}` → `{avatars}`; does not require entry |
-| `stop` | `{sessionId,id}` → `{ok:true}` |
-| `leave` | `{sessionId}` → `{ok:true}`; no active session is already left |
+| Endpoint under `/api/agents/` | Body / result                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `link/start`                  | `{name}` → `{code, secret, expiresAt}`; no bearer required                                             |
+| `link/poll`                   | `{}` with the returned secret as bearer → pending or approved grant                                    |
+| `enter`                       | `{}` → observation; concurrent/retried entry shares one session                                        |
+| `observe`                     | `{sessionId}` → observation                                                                            |
+| `speak`                       | `{sessionId,id,text}` → `{ok:true}`                                                                    |
+| `move-to`                     | `{sessionId,id,x,y,floor}` → `{operationId}`                                                           |
+| `step`                        | `{sessionId,id,x,y,floor}` → `{operationId}`; adjacent same-floor step                                 |
+| `interact`                    | `{sessionId,id,target}` → `{ok:true}`; observed object ID                                              |
+| `expression`                  | `{sessionId,id,expression}` → `{ok:true}`                                                              |
+| `follow`, `approach`          | `{sessionId,id,player}` → `{operationId}`; observed roster ID                                          |
+| `avatar`                      | `{kind,emoji?,data?,preset?,expression?}` → appearance summary; `data` is base64 for image/GLB uploads |
+| `world-status`                | `{}` → `{potentialParticipants}`; does not require entry                                               |
+| `guide`                       | `{query?}` → handbook topics or matches; does not require entry                                        |
+| `avatar-catalog`              | `{}` → `{avatars}`; does not require entry                                                             |
+| `stop`                        | `{sessionId,id}` → `{ok:true}`                                                                         |
+| `leave`                       | `{sessionId}` → `{ok:true}`; no active session is already left                                         |
 
 Approved pairing is required for all routes above except `link/start` and the
 pending phase of `link/poll`. Avatar and reference routes do not require an active

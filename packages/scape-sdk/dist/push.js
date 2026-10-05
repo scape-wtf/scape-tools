@@ -2,10 +2,13 @@ import { exactKeys, record, ObjectActionError } from './api.js';
 export function gizmoPushError(value) {
     if (value === null)
         return null;
-    return record(value) && exactKeys(value, ['direction', 'blockOpposingInput'])
-        && typeof value.direction === 'string' && ['right', 'down', 'left', 'up'].includes(value.direction)
-        && (value.blockOpposingInput === undefined || typeof value.blockOpposingInput === 'boolean')
-        ? null : 'push must return null or a cardinal direction with optional boolean blockOpposingInput.';
+    return record(value) &&
+        exactKeys(value, ['direction', 'blockOpposingInput']) &&
+        typeof value.direction === 'string' &&
+        ['right', 'down', 'left', 'up'].includes(value.direction) &&
+        (value.blockOpposingInput === undefined || typeof value.blockOpposingInput === 'boolean')
+        ? null
+        : 'push must return null or a cardinal direction with optional boolean blockOpposingInput.';
 }
 /** Pure state-derived intent, checked during registration, actions and host evaluation. */
 export function resolveGizmoPush(definition, state) {

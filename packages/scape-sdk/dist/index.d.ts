@@ -1,5 +1,5 @@
-export { defineProject, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt } from './api.js';
-export type { ProjectDefinition, ObjectInstance, ObjectConfiguration, ObjectViewer, ObjectContext, ObjectAction, ObjectControl, ObjectChoice, ObjectField, ObjectView, ObjectDefinition } from './api.js';
+export { defineProject, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt, } from './api.js';
+export type { ProjectDefinition, ObjectInstance, ObjectConfiguration, ObjectViewer, ObjectContext, ObjectAction, ObjectControl, ObjectChoice, ObjectField, ObjectView, ObjectDefinition, } from './api.js';
 export * from './presentation.js';
 export * from './text.js';
 export * from './audio.js';
@@ -17,6 +17,6 @@ export * from './configuration.js';
 export * from './soundBank.js';
 export * from './sprite.js';
 export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction } from './reaction.js';
-export type { GizmoFeedback, GizmoReaction, GizmoReactionContext, GizmoInteraction } from './reaction.js';
+export type { GizmoFeedback, GizmoReaction, GizmoReactionContext, GizmoInteraction, } from './reaction.js';
 export * from './travel.js';
 export * from './navigation.js';

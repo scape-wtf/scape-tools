@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node ../../../node_modules/typescript/bin/tsc -p tsconfig.json",
     "dev": "node ../../../packages/scape-cli/cli.mjs gizmo dev",
-    "test": "yarn build && node --test test/*.test.mjs"
+    "test": "npm run build && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@scape-wtf/sdk": "0.1.0"

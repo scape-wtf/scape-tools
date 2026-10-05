@@ -18,7 +18,7 @@ After installing root dependencies and running `npm run build:gizmos`, run
 `npm run build` and `npm test` here. Pair with
 `npm run dev`.
 Export from the root with
-`yarn sdk:starter /absolute/path/my-chime --template chime`.
+`npm exec -- scape gizmo init /absolute/path/my-chime --template chime`.
 
 The package tests verify cooldown and accepted-action feedback. Use the server
 `gizmoEvents.integration.test.ts` and `roomRealtime.test.ts` checks for validation. The latter

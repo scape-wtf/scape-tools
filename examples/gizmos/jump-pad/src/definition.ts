@@ -8,8 +8,7 @@ export const jumpPad = defineObject<Record<string, never>>({
   label: 'Jump pad',
   hint: 'Walk into this pad to jump four cells east',
   initial: () => ({}),
-  valid: (state): state is Record<string, never> =>
-    record(state) && exactKeys(state, []),
+  valid: (state): state is Record<string, never> => record(state) && exactKeys(state, []),
   actions: {},
   walkable: true,
   travel: () => ({

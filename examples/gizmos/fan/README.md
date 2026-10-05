@@ -32,7 +32,7 @@ walkable-only 🟦 example demonstrates that neither callback is required for a 
 Export an independent copy:
 
 ```sh
-yarn sdk:starter /absolute/new/fan-project --template fan
+npm exec -- scape gizmo init /absolute/new/fan-project --template fan
 ```
 
 Inside that copy, run `npm install`, `npm test`, then

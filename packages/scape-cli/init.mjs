@@ -31,16 +31,28 @@ export async function initProject(destination) {
   }
   const manifestPath = path.join(output, 'package.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  manifest.name = path.basename(output).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 60) || 'my-scape-project';
+  manifest.name =
+    path
+      .basename(output)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .slice(0, 60) || 'my-scape-project';
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
   // When invoked from an exported project, carry its local kit packages along.
   const cliRoot = fileURLToPath(new URL('./', import.meta.url));
-  const candidates = [path.resolve(cliRoot, '../../..', 'vendor'), path.resolve(process.cwd(), 'vendor')];
+  const candidates = [
+    path.resolve(cliRoot, '../../..', 'vendor'),
+    path.resolve(process.cwd(), 'vendor'),
+  ];
   for (const vendor of candidates) {
-    try { await Promise.all(kitPackages.map(name => readFile(path.join(vendor, `${name}.tgz`)))); }
-    catch { continue; }
+    try {
+      await Promise.all(kitPackages.map(name => readFile(path.join(vendor, `${name}.tgz`))));
+    } catch {
+      continue;
+    }
     await mkdir(path.join(output, 'vendor'));
-    for (const name of kitPackages) await cp(path.join(vendor, `${name}.tgz`), path.join(output, 'vendor', `${name}.tgz`));
+    for (const name of kitPackages)
+      await cp(path.join(vendor, `${name}.tgz`), path.join(output, 'vendor', `${name}.tgz`));
     useKitArchives(manifest);
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     break;

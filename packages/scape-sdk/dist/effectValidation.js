@@ -4,7 +4,9 @@ export function effectRecord(value, path, keys) {
     if (!record(value))
         return `${path} must be an object.`;
     const extra = Object.keys(value).find(key => !keys.includes(key));
-    return extra === undefined ? null : `${path} has an unsupported field: ${JSON.stringify(extra.slice(0, 60))}.`;
+    return extra === undefined
+        ? null
+        : `${path} has an unsupported field: ${JSON.stringify(extra.slice(0, 60))}.`;
 }
 export function effectNumber(value, path, min, max) {
     if (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max)

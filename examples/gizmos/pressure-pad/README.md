@@ -21,7 +21,7 @@ to change direction; moving, saving or deleting affects the whole combined item.
 To edit its source independently, export a standalone project:
 
 ```sh
-yarn sdk:starter /absolute/path/my-pressure-pad --template pressure-pad
+npm exec -- scape gizmo init /absolute/path/my-pressure-pad --template pressure-pad
 ```
 
 In the exported directory, run `npm install`, `npm test`, then

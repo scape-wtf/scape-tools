@@ -12,7 +12,7 @@ export function fft(real, imag, inverse = false) {
         }
     }
     for (let width = 2; width <= n; width *= 2) {
-        const angle = (inverse ? 2 : -2) * Math.PI / width, wr = Math.cos(angle), wi = Math.sin(angle);
+        const angle = ((inverse ? 2 : -2) * Math.PI) / width, wr = Math.cos(angle), wi = Math.sin(angle);
         for (let start = 0; start < n; start += width) {
             let r = 1, im = 0;
             for (let j = 0; j < width / 2; j++) {
@@ -63,10 +63,10 @@ export function noiseImpulse(duration, decay, seed, rate) {
     for (const channel of channels)
         for (let i = 0; i < count; i++) {
             seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-            channel[i] = (seed / 0xffffffff * 2 - 1) * (1 - i / count) ** decay;
+            channel[i] = ((seed / 0xffffffff) * 2 - 1) * (1 - i / count) ** decay;
             energy += channel[i] ** 2;
         }
-    const scale = .00125 * 44100 / rate / Math.max(.000125, Math.sqrt(energy / (2 * count)));
+    const scale = (0.00125 * 44100) / rate / Math.max(0.000125, Math.sqrt(energy / (2 * count)));
     for (const channel of channels)
         for (let i = 0; i < count; i++)
             channel[i] *= scale;

@@ -27,7 +27,7 @@ const valid = (s: unknown): s is VotingState =>
   Array.isArray(s.choices) &&
   s.choices.length >= 2 &&
   s.choices.length <= 4 &&
-  s.choices.every((c) => text(c, 60)) &&
+  s.choices.every(c => text(c, 60)) &&
   new Set(s.choices).size === s.choices.length &&
   Number.isSafeInteger(s.round) &&
   Number(s.round) >= 0 &&
@@ -35,7 +35,7 @@ const valid = (s: unknown): s is VotingState =>
   Array.isArray(s.ballots) &&
   s.ballots.length <= 256 &&
   s.ballots.every(
-    (b) =>
+    b =>
       record(b) &&
       exactKeys(b, ['voter', 'choice']) &&
       actorId(b.voter) &&
@@ -43,7 +43,7 @@ const valid = (s: unknown): s is VotingState =>
       Number(b.choice) >= 0 &&
       Number(b.choice) < (s.choices as unknown[]).length,
   ) &&
-  new Set(s.ballots.map((b) => b.voter)).size === s.ballots.length;
+  new Set(s.ballots.map(b => b.voter)).size === s.ballots.length;
 function round(state: VotingState, payload: Record<string, unknown>) {
   if (payload.round !== state.round)
     throw new ObjectActionError(409, 'This poll changed. Open it again.');
@@ -75,7 +75,7 @@ export const votingBooth = defineObject<VotingState>({
           Number(payload.choice) >= state.choices.length
         )
           throw new ObjectActionError(400, 'Choose an answer');
-        const ballots = state.ballots.filter((b) => b.voter !== context.actorId);
+        const ballots = state.ballots.filter(b => b.voter !== context.actorId);
         if (ballots.length >= 256) throw new ObjectActionError(409, 'This poll is full');
         return {
           ...state,
@@ -92,7 +92,7 @@ export const votingBooth = defineObject<VotingState>({
           throw new ObjectActionError(409, 'Reset the poll before changing its question');
         const question = typeof payload.question === 'string' ? payload.question.trim() : '';
         const choices = [payload.choice0, payload.choice1, payload.choice2, payload.choice3]
-          .map((c) => (typeof c === 'string' ? c.trim() : ''))
+          .map(c => (typeof c === 'string' ? c.trim() : ''))
           .filter(Boolean);
         const next = {
           ...state,
@@ -154,10 +154,10 @@ export const votingBooth = defineObject<VotingState>({
     controls: [
       ...state.choices.map((choice, i) => ({
         id: `vote-${i}`,
-        label: `${choice} · ${state.ballots.filter((b) => b.choice === i).length}`,
+        label: `${choice} · ${state.ballots.filter(b => b.choice === i).length}`,
         action: { name: 'vote', payload: { choice: i, round: state.round } },
         disabled: !state.open,
-        pressed: state.ballots.some((b) => b.voter === viewer.actorId && b.choice === i),
+        pressed: state.ballots.some(b => b.voter === viewer.actorId && b.choice === i),
       })),
       ...(viewer.canEdit
         ? [

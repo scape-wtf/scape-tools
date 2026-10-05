@@ -1,4 +1,4 @@
-export { defineProject, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt } from './api.js';
+export { defineProject, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt, } from './api.js';
 export * from './presentation.js';
 export * from './text.js';
 export * from './audio.js';

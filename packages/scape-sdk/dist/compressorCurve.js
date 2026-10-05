@@ -18,16 +18,17 @@ export function createCompressorCurve({ threshold, knee, ratio }) {
         let low = 0, high = 64;
         for (let iteration = 0; iteration < 40; iteration++) {
             coefficient = (low + high) / 2;
-            const output = start + (end - start) * -Math.expm1(-coefficient) / coefficient;
-            const endSlope = end * Math.exp(-coefficient) / output;
+            const output = start + ((end - start) * -Math.expm1(-coefficient)) / coefficient;
+            const endSlope = (end * Math.exp(-coefficient)) / output;
             if (endSlope > slope)
                 low = coefficient;
             else
                 high = coefficient;
         }
     }
-    const kneeOutput = (amplitude) => start + (end - start)
-        * -Math.expm1(-coefficient * (amplitude - start) / (end - start)) / coefficient;
+    const kneeOutput = (amplitude) => start +
+        ((end - start) * -Math.expm1((-coefficient * (amplitude - start)) / (end - start))) /
+            coefficient;
     const upperOutput = knee > 0 ? kneeOutput(end) : start;
     const output = (amplitude) => {
         if (amplitude <= start)
@@ -37,7 +38,7 @@ export function createCompressorCurve({ threshold, knee, ratio }) {
         return upperOutput * (amplitude / end) ** slope;
     };
     return {
-        gain: (amplitude) => amplitude <= start ? 1 : output(amplitude) / amplitude,
+        gain: (amplitude) => (amplitude <= start ? 1 : output(amplitude) / amplitude),
         makeup: 1,
     };
 }

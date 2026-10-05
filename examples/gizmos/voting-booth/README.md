@@ -37,7 +37,7 @@ or account-unique election. The host grants editing only to the placer with buil
 permission. Changing a question, closing/reopening, or resetting advances the round;
 old submissions are rejected.
 
-To see edits in your private developer world, run:
+To see edits in your hosted Scape developer world, run:
 
 ```sh
 npm run dev
@@ -60,4 +60,4 @@ from the sidebar. No token is written to disk or printed.
 
 Uploads run in Scape's restricted gizmo runtime and use normal signed world actions.
 The game also uses this source as its bundled starter. The standalone project contains no
-game renderer or world server. Shared preview publishing and tester invitations remain pending; this connection updates the owner's private world only.
+game renderer or world server. Shared preview publishing and tester invitations remain pending; this connection updates the owner's hosted Scape developer world only.

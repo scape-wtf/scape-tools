@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { agentContractArtifacts, generateAgentContracts } from '../../tools/dev/agent-contracts.mjs';
+import {
+  agentContractArtifacts,
+  generateAgentContracts,
+} from '../../tools/dev/agent-contracts.mjs';
 
 test('packaged agent types and limits match the canonical host wire contract', async () => {
   await generateAgentContracts(true);

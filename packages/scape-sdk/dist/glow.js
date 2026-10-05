@@ -11,14 +11,21 @@ export function gizmoGlowError(value) {
     const size = effectNumber(v.size, 'glow.size', 16, 128);
     if (size)
         return size;
-    for (const [name, fields] of [['pulse', ['speed', 'amount', 'phaseX']], ['opacity', ['base', 'amount', 'speed', 'phaseY']]]) {
+    for (const [name, fields] of [
+        ['pulse', ['speed', 'amount', 'phaseX']],
+        ['opacity', ['base', 'amount', 'speed', 'phaseY']],
+    ]) {
         const error = effectRecord(v[name], `glow.${name}`, [...fields]);
         if (error)
             return error;
     }
     if (!record(v.pulse) || !record(v.opacity))
         return 'glow.pulse and glow.opacity must be objects.';
-    for (const [key, max] of [['speed', 8], ['amount', .25], ['phaseX', 8]]) {
+    for (const [key, max] of [
+        ['speed', 8],
+        ['amount', 0.25],
+        ['phaseX', 8],
+    ]) {
         const error = effectNumber(v.pulse[key], `glow.pulse.${key}`, 0, max);
         if (error)
             return error;
@@ -40,7 +47,7 @@ export function gizmoGlowError(value) {
             return shape;
         const hue = v.hue;
         for (const key of ['speed', 'phaseY', 'saturation', 'lightness']) {
-            const error = effectNumber(hue[key], `glow.hue.${key}`, 0, key === 'speed' ? .25 : 1);
+            const error = effectNumber(hue[key], `glow.hue.${key}`, 0, key === 'speed' ? 0.25 : 1);
             if (error)
                 return error;
         }
@@ -53,8 +60,10 @@ export function validGizmoGlow(value) {
 export function gizmoGlowFrame(glow, seconds, x, y, reducedMotion = false) {
     const time = reducedMotion ? 0 : seconds;
     return {
-        size: glow.size * (1 + Math.sin(time * glow.pulse.speed + x * glow.pulse.phaseX) * glow.pulse.amount),
-        opacity: glow.opacity.base + Math.sin(time * glow.opacity.speed + y * glow.opacity.phaseY) * glow.opacity.amount,
+        size: glow.size *
+            (1 + Math.sin(time * glow.pulse.speed + x * glow.pulse.phaseX) * glow.pulse.amount),
+        opacity: glow.opacity.base +
+            Math.sin(time * glow.opacity.speed + y * glow.opacity.phaseY) * glow.opacity.amount,
         hue: glow.hue ? (time * glow.hue.speed + y * glow.hue.phaseY) % 1 : undefined,
     };
 }

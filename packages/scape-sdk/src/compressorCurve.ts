@@ -10,7 +10,8 @@ type Compressor = NonNullable<GizmoAudioBus['compressor']>;
  * this does not copy the browser's detector, lookahead or attack/release engine.
  */
 export function createCompressorCurve({ threshold, knee, ratio }: Compressor) {
-  const start = 10 ** (threshold / 20), end = start * 10 ** (knee / 20);
+  const start = 10 ** (threshold / 20),
+    end = start * 10 ** (knee / 20);
   const slope = 1 / ratio;
   if (ratio === 1) return { gain: (_amplitude: number) => 1, makeup: 1 };
 
@@ -19,17 +20,20 @@ export function createCompressorCurve({ threshold, knee, ratio }: Compressor) {
   // once per bus avoids repeated coefficient searches on every audio chunk.
   let coefficient = 0;
   if (knee > 0) {
-    let low = 0, high = 64;
+    let low = 0,
+      high = 64;
     for (let iteration = 0; iteration < 40; iteration++) {
       coefficient = (low + high) / 2;
-      const output = start + (end - start) * -Math.expm1(-coefficient) / coefficient;
-      const endSlope = end * Math.exp(-coefficient) / output;
+      const output = start + ((end - start) * -Math.expm1(-coefficient)) / coefficient;
+      const endSlope = (end * Math.exp(-coefficient)) / output;
       if (endSlope > slope) low = coefficient;
       else high = coefficient;
     }
   }
-  const kneeOutput = (amplitude: number) => start + (end - start)
-    * -Math.expm1(-coefficient * (amplitude - start) / (end - start)) / coefficient;
+  const kneeOutput = (amplitude: number) =>
+    start +
+    ((end - start) * -Math.expm1((-coefficient * (amplitude - start)) / (end - start))) /
+      coefficient;
   const upperOutput = knee > 0 ? kneeOutput(end) : start;
   const output = (amplitude: number): number => {
     if (amplitude <= start) return amplitude;
@@ -37,7 +41,7 @@ export function createCompressorCurve({ threshold, knee, ratio }: Compressor) {
     return upperOutput * (amplitude / end) ** slope;
   };
   return {
-    gain: (amplitude: number) => amplitude <= start ? 1 : output(amplitude) / amplitude,
+    gain: (amplitude: number) => (amplitude <= start ? 1 : output(amplitude) / amplitude),
     makeup: 1,
   };
 }

@@ -67,7 +67,9 @@ export class GizmoSequenceRenderer {
         if (events.length > 8)
             throw new Error('Audio bus event limit exceeded');
         for (const event of events) {
-            if (!Number.isSafeInteger(event.at) || event.at < this.frame || event.at > this.frame + N + 4800)
+            if (!Number.isSafeInteger(event.at) ||
+                event.at < this.frame ||
+                event.at > this.frame + N + 4800)
                 throw new Error('Audio bus event is outside its scheduling window');
             if (event.sound.duration > 3 || event.sound.effects?.length)
                 throw new Error('Audio bus strikes must be dry and at most three seconds');
@@ -90,7 +92,11 @@ export class GizmoSequenceRenderer {
             const d = this.bus.delay;
             for (let i = 0; i < N; i++) {
                 const absolute = this.frame + i, index = absolute % 100000;
-                const seconds = d.time + (d.modulation ? Math.sin(2 * Math.PI * d.modulation.frequency * absolute / GIZMO_BUS_RATE) * d.modulation.depth : 0);
+                const seconds = d.time +
+                    (d.modulation
+                        ? Math.sin((2 * Math.PI * d.modulation.frequency * absolute) / GIZMO_BUS_RATE) *
+                            d.modulation.depth
+                        : 0);
                 const at = (index - seconds * GIZMO_BUS_RATE + 100000) % 100000, left = Math.floor(at), fraction = at - left;
                 for (let c = 0; c < 2; c++) {
                     const buffer = this.delays[c], wet = buffer[left] + (buffer[(left + 1) % 100000] - buffer[left]) * fraction;
@@ -112,7 +118,8 @@ export class GizmoSequenceRenderer {
             for (let i = 0; i < N; i++) {
                 const peak = Math.max(Math.abs(output[0][i]), Math.abs(output[1][i]));
                 const target = curve.gain(peak), seconds = target < this.compression ? c.attack : c.release;
-                this.compression += (target - this.compression) * (1 - Math.exp(-1 / (seconds * GIZMO_BUS_RATE)));
+                this.compression +=
+                    (target - this.compression) * (1 - Math.exp(-1 / (seconds * GIZMO_BUS_RATE)));
                 for (let channel = 0; channel < 2; channel++)
                     output[channel][i] *= this.compression * curve.makeup;
             }

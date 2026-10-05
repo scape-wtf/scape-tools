@@ -1,23 +1,49 @@
 import type { AgentObservation, AgentMovement, AgentPursuit } from './contracts.mjs';
 
 export interface AgentTools {
-  call(name: string, args?: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  call(
+    name: string,
+    args?: Record<string, unknown>,
+    options?: { signal?: AbortSignal },
+  ): Promise<Record<string, unknown>>;
 }
 /** A connected MCP client. Model/provider configuration stays with its owner. */
 export function mcpTools(client: {
-  callTool(request: { name: string; arguments: Record<string, unknown> }, schema?: undefined,
-    options?: { signal?: AbortSignal }): Promise<{
-      isError?: boolean; structuredContent?: unknown;
-      content: Array<{ type: string; text?: string }>;
-    }>;
+  callTool(
+    request: { name: string; arguments: Record<string, unknown> },
+    schema?: undefined,
+    options?: { signal?: AbortSignal },
+  ): Promise<{
+    isError?: boolean;
+    structuredContent?: unknown;
+    content: Array<{ type: string; text?: string }>;
+  }>;
 }): AgentTools;
 
 export type AgentEvent =
   | { type: 'ready' }
   | { type: 'idle' }
-  | { type: 'social'; focus?: string; greeting?: string; people: Array<{id:string;mayGreet:boolean;encounter?:import('./encounters.mjs').EncounterContext;quiet?:boolean;outwardTone?:'neutral'|'upset'|'hurried'|'cheerful'}>;
-      waiting: boolean; quiet: boolean; clarify?: boolean; history?: Array<Record<string,unknown>>; recentActions?: Array<Record<string,unknown>>; moodState?: {valence:number;warmth:number;energy:number;openness:number}; bodyIntent?: 'relaxed'|'attentive'|'lively'|'subdued'; mood: 'neutral'|'warm'|'curious'|'concerned'|'playful' }
-  | { type: 'action_failure'; code:string; player?:string }
+  | {
+      type: 'social';
+      focus?: string;
+      greeting?: string;
+      people: Array<{
+        id: string;
+        mayGreet: boolean;
+        encounter?: import('./encounters.mjs').EncounterContext;
+        quiet?: boolean;
+        outwardTone?: 'neutral' | 'upset' | 'hurried' | 'cheerful';
+      }>;
+      waiting: boolean;
+      quiet: boolean;
+      clarify?: boolean;
+      history?: Array<Record<string, unknown>>;
+      recentActions?: Array<Record<string, unknown>>;
+      moodState?: { valence: number; warmth: number; energy: number; openness: number };
+      bodyIntent?: 'relaxed' | 'attentive' | 'lively' | 'subdued';
+      mood: 'neutral' | 'warm' | 'curious' | 'concerned' | 'playful';
+    }
+  | { type: 'action_failure'; code: string; player?: string }
   | { type: 'speech'; player: AgentObservation['players'][number] }
   | { type: 'participants'; joined: string[]; left: string[] }
   | { type: 'movement'; operation: AgentMovement }
@@ -45,7 +71,10 @@ export interface AgentPolicy {
   /** Synchronous perception update, including during an outstanding model turn. */
   onObservation?(observation: AgentObservation, events: AgentEvent[], context: AgentContext): void;
   /** At most one turn at a time. Waiting for activity makes no model calls. */
-  onTurn?(turn: { observation: AgentObservation; events: AgentEvent[] }, context: AgentContext): Promise<void> | void;
+  onTurn?(
+    turn: { observation: AgentObservation; events: AgentEvent[] },
+    context: AgentContext,
+  ): Promise<void> | void;
   /** Optional synchronous local behavior tick, separate from model scheduling. */
   tick?(now: number, context: AgentContext): void;
   /** Dispose local policy resources after departure; honor context.signal. */

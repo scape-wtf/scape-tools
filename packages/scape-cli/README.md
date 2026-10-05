@@ -15,20 +15,22 @@ scape --help
 
 For a one-off command, use `npx @scape-wtf/cli@latest`.
 
-| Command | Purpose |
-| --- | --- |
-| `scape gizmo init <new-directory>` | Scaffold a blank Gizmo project |
-| `scape gizmo dev --origin <https-url>` | Bundle, watch and upload a project to its private developer world |
-| `scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]` | Scaffold a persistent agent with provider configuration |
-| `scape agent run [--origin <https-url>]` | Guide setup and pairing, then run a saved agent |
-| `scape agent configure` / `login` / `status` | Manage settings, approval and status |
-| `scape agent run --project <directory> --origin <https-url>` | Run an optional custom-code project |
-| `scape agent mcp config --origin <https-url>` | Print secret-free MCP host configuration |
-| `scape agent mcp serve --origin <https-url>` | Serve local stdio MCP tools |
+| Command                                                                                  | Purpose                                                                |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `scape gizmo init <new-directory>`                                                       | Scaffold a blank Gizmo project                                         |
+| `scape gizmo dev --origin <https-url>`                                                   | Bundle, watch and upload a project to its hosted Scape developer world |
+| `scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]` | Scaffold a persistent agent with provider configuration                |
+| `scape agent run [--origin <https-url>]`                                                 | Guide setup and pairing, then run a saved agent                        |
+| `scape agent configure` / `login` / `status`                                             | Manage settings, approval and status                                   |
+| `scape agent run --project <directory> --origin <https-url>`                             | Run an optional custom-code project                                    |
+| `scape agent mcp config --origin <https-url>`                                            | Print secret-free MCP host configuration                               |
+| `scape agent mcp serve --origin <https-url>`                                             | Serve local stdio MCP tools                                            |
 
-Run `yarn scape --help` from the installed source workspace or an installed kit.
+Run `scape --help` after installation, or use `npx @scape-wtf/cli@latest --help`.
 `scape init` and `scape dev` remain compatibility aliases; use namespaced commands
 for new documentation and scripts.
+
+## Contributor/source-workspace notes
 
 ## Obtain and install a kit
 
@@ -93,11 +95,11 @@ Decision model choices include TypeSafe JEV, Cloudflare Clef/Clef-flash, System 
 and structured-output compatible endpoints, or a trusted local adapter file.
 No decision provider is enabled by default. Decision failure or request-budget
 exhaustion disables that stage for the run while basic behavior continues;
-conversation-provider failures retain their stop behavior. See [decision setup](../../apps/docs/content/agents/decision-models.md).
+conversation-provider failures retain their stop behavior. See [decision setup](https://developer.scape.wtf/agents/decision-models).
 Normal provider charges apply. The default 200-request limit resets per process
 and is not a currency cap. History stays in memory. Trusted custom policies can
-replace the built-in model policy. See the [quickstart](../../apps/docs/content/agents/quickstart.md)
-and [configuration reference](../../apps/docs/content/agents/configuration.md).
+replace the built-in model policy. See the [quickstart](https://developer.scape.wtf/agents/quickstart)
+and [configuration reference](https://developer.scape.wtf/agents/configuration).
 
 ## Interactive MCP testing
 
@@ -162,7 +164,7 @@ gizmo identity/version while instances are placed; remove them before changing i
 All saved state must validate under an update, including when switching projects.
 Remove placed instances before removing their definition. Empty projects are allowed.
 There is no automatic migration, shared project state or reset. Public publishing remains
-later work. The entire project shares the 1 MiB upload limit including embedded models and audio. See the [developer guide](../../docs/developer-playground.md).
+later work. The entire project shares the 1 MiB upload limit including embedded models and audio. See the [developer guide](https://developer.scape.wtf/gizmos/quickstart).
 
 Scape executes uploaded code inside the restricted runtime and supplies real permission,
 identity, time and randomness to authoritative actions. The CLI never supplies saved
@@ -172,11 +174,11 @@ maps are not uploaded.
 
 Procedural sounds upload as compact SDK definitions; the game renders them in a worker.
 Imported `.glb` and optional recorded PCM16 `.wav` files are embedded as base64 and included in source watching. See the
-[presentation contract](../../docs/gizmo-presentation.md) for supported geometry, audio limits and authoring.
+[presentation contract](https://developer.scape.wtf/gizmos/presentation) for supported geometry, audio limits and authoring.
 
 Effect validation identifies the gizmo type, field, supplied number and allowed range.
 The terminal names the last confirmed build; the in-game sidebar names the working
 local revision, or says no local build is active. Correct the setting and save to retry.
 Rejected uploads do not replace the accepted build. Direct edits to Scape's built-in
 workspace packages bypass this upload recovery boundary; see the
-[effect recovery contract](../../docs/gizmo-presentation.md#effect-diagnostics-and-recovery).
+[effect recovery contract](https://developer.scape.wtf/gizmos/presentation#effect-diagnostics-and-recovery).

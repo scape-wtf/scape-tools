@@ -23,8 +23,7 @@ const vote = (instance, choice, actor = 'alice') =>
     },
     context(actor),
   );
-const rejected = (status) => (error) =>
-  error instanceof ObjectActionError && error.status === status;
+const rejected = status => error => error instanceof ObjectActionError && error.status === status;
 
 test('votes are changeable, isolated, serializable and reflected in declarative controls', () => {
   const original = create();
@@ -40,13 +39,13 @@ test('votes are changeable, isolated, serializable and reflected in declarative 
   const restored = JSON.parse(JSON.stringify(booth));
   assert.equal(registry.validate(restored), true);
   const view = votingBooth.view(restored.state, context());
-  assert.equal(view.controls.find((c) => c.id === 'vote-1').pressed, true);
+  assert.equal(view.controls.find(c => c.id === 'vote-1').pressed, true);
   assert.equal(
-    view.controls.some((c) => c.id === 'reset'),
+    view.controls.some(c => c.id === 'reset'),
     false,
   );
   assert.equal(
-    votingBooth.view(restored.state, context('alice', true)).controls.find((c) => c.id === 'reset')
+    votingBooth.view(restored.state, context('alice', true)).controls.find(c => c.id === 'reset')
       .confirm,
     'Clear all votes?',
   );

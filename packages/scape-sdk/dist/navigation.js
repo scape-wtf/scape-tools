@@ -3,26 +3,53 @@ import { gizmoFeedbackError } from './reaction.js';
 import { resolveGizmoSounds } from './soundBank.js';
 export const validGizmoWorldId = (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]{5,23}$/.test(value);
 export function validGizmoWorldDestination(value) {
-    return record(value) && exactKeys(value, ['id', 'name']) && validGizmoWorldId(value.id)
-        && typeof value.name === 'string' && value.name.length <= 32 && !/[\u0000-\u001f\u007f]/.test(value.name);
+    return (record(value) &&
+        exactKeys(value, ['id', 'name']) &&
+        validGizmoWorldId(value.id) &&
+        typeof value.name === 'string' &&
+        value.name.length <= 32 &&
+        !/[\u0000-\u001f\u007f]/.test(value.name));
 }
 export function validGizmoWorldEditor(value) {
     const id = (v) => typeof v === 'string' && /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v);
-    return record(value) && exactKeys(value, ['field', 'action', 'label']) && id(value.field) && id(value.action)
-        && typeof value.label === 'string' && value.label.length > 0 && value.label.length <= 80;
+    return (record(value) &&
+        exactKeys(value, ['field', 'action', 'label']) &&
+        id(value.field) &&
+        id(value.action) &&
+        typeof value.label === 'string' &&
+        value.label.length > 0 &&
+        value.label.length <= 80);
 }
 export function gizmoNavigationError(value, definition, state) {
     if (value === null)
         return null;
-    if (!record(value) || !exactKeys(value, ['world', 'transition', 'feedback']) || !jsonData(value) || !validGizmoWorldId(value.world))
+    if (!record(value) ||
+        !exactKeys(value, ['world', 'transition', 'feedback']) ||
+        !jsonData(value) ||
+        !validGizmoWorldId(value.world))
         return 'Invalid world navigation request';
     if (value.transition !== undefined) {
         const t = value.transition;
-        if (!record(t) || !exactKeys(t, ['durationMs', 'scale', 'opacity', 'trail']) || typeof t.durationMs !== 'number' || t.durationMs < 1 || t.durationMs > 1000
-            || typeof t.scale !== 'number' || t.scale < .02 || t.scale > 1 || typeof t.opacity !== 'number' || t.opacity < .02 || t.opacity > 1)
+        if (!record(t) ||
+            !exactKeys(t, ['durationMs', 'scale', 'opacity', 'trail']) ||
+            typeof t.durationMs !== 'number' ||
+            t.durationMs < 1 ||
+            t.durationMs > 1000 ||
+            typeof t.scale !== 'number' ||
+            t.scale < 0.02 ||
+            t.scale > 1 ||
+            typeof t.opacity !== 'number' ||
+            t.opacity < 0.02 ||
+            t.opacity > 1)
             return 'Invalid navigation transition';
-        if (t.trail !== undefined && (!record(t.trail) || !exactKeys(t.trail, ['color', 'opacity']) || typeof t.trail.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(t.trail.color)
-            || typeof t.trail.opacity !== 'number' || t.trail.opacity < 0 || t.trail.opacity > 1))
+        if (t.trail !== undefined &&
+            (!record(t.trail) ||
+                !exactKeys(t.trail, ['color', 'opacity']) ||
+                typeof t.trail.color !== 'string' ||
+                !/^#[0-9a-f]{6}$/i.test(t.trail.color) ||
+                typeof t.trail.opacity !== 'number' ||
+                t.trail.opacity < 0 ||
+                t.trail.opacity > 1))
             return 'Invalid navigation trail';
     }
     if (value.feedback !== undefined) {

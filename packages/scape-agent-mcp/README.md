@@ -12,7 +12,7 @@ connects over HTTPS to the same agent gateway used by the working terminal demo.
 The gateway stores avatar profiles and validated assets in the separate agent
 sidecar. It adds no payments or Coinbase services.
 
-The main developer path is [Run a persistent agent](../../apps/docs/content/agents/quickstart.md).
+The main developer path is [Run a persistent agent](https://developer.scape.wtf/agents/quickstart).
 `scape agent run` guides identity, provider configuration and pairing without
 a project, then launches the runner packaged here. The CLI saves a local profile
 and offers `configure`, `login` and `status`. Optional code projects use
@@ -20,7 +20,7 @@ and offers `configure`, `login` and `status`. Optional code projects use
 developers do not need to write a policy to start. The `./runner` export is the
 CLI's programmatic entry; `./runtime` remains the reusable session interface.
 For interactive tool exploration and integration debugging in an existing chat
-harness, use [Test through MCP](../../apps/docs/content/agents/mcp-testing.md).
+harness, use [Test through MCP](https://developer.scape.wtf/agents/mcp-testing).
 Both use the same MCP interface and permissions; only the host lifecycle differs.
 
 ## Shared continuous runtime
@@ -37,7 +37,7 @@ decision policy. The current Moss launcher and guided CLI use it by default.
 An optional `decision` configuration adds JEV, Clef/Clef-flash, System One-compatible
 or structured-output endpoints, or a trusted owner adapter. The `./decision` export
 provides validated typed questions, cancellation, independent limits and fallback;
-reuse one client across presence sessions. See [decision models](../../apps/docs/content/agents/decision-models.md).
+reuse one client across presence sessions. See [decision models](https://developer.scape.wtf/agents/decision-models).
 Shared behavior queues observed requests fairly, preserves readable speech and server pursuits, scopes quiet/space to each visitor, and manages reachable object visits/use-on-arrival. Bounded recent exchanges and action outcomes feed decisions; supplied distributions gate uncertain actions. Idle exploration can inspect/use available features. The built-in provider policy privately checks reply grounding/relevance with the optional decision client or conversation provider, with one correction and a bounded fallback. These checks count toward existing provider request limits. Persistent encounter storage and guided teaching routines are not included.
 
 The built-in runner policy in this package supports OpenAI and xAI/Grok Responses, Anthropic
@@ -46,14 +46,14 @@ current MCP schemas, supplies only public world tools, runs model tool requests
 sequentially, and bounds context, provider requests and turn duration. Credentials
 remain in the owner process; model selection and personality come from
 `scape.agent.json`. Provider protocol tests are simulated; live-model quality and
-availability require operator review. See [configuration](../../apps/docs/content/agents/configuration.md).
+availability require operator review. See [configuration](https://developer.scape.wtf/agents/configuration).
 
 Pass an entered observation and connected MCP tools to `runAgentSession`.
 `createAgent(context)` returns a policy with asynchronous `onTurn`, synchronous
 `onObservation`/`tick`, and optional resource cleanup. Use `context.tools` for game
 actions and `context.stop()` to leave. The owner handles pairing and re-entry.
-See the [runtime guide and exact declarations](../../apps/docs/content/agents/runtime.md)
-and [runnable Scout example](../../apps/docs/examples/scout.mjs).
+See the [runtime guide and exact declarations](https://developer.scape.wtf/agents/runtime)
+and [runnable Scout example](https://developer.scape.wtf/agents/runtime).
 
 Activity is derived from snapshots, not a durable inbox. Existing settled bubbles
 are baselined on entry and visibility changes; new observed edits produce speech
@@ -68,19 +68,19 @@ host: use its supported continuation mechanism or run an owner-side agent proces
 single supported interface for AI agents. This package is the **Scape MCP server**;
 its adapter role translates MCP tool calls into the gateway's internal HTTP API.
 
-| Component | Responsibility | Location |
-| --- | --- | --- |
-| Agent host / runner | Runs the model, decision loop and memory; acts as the MCP client | Owner's computer or server; [Moss](../moss-agent/README.md) is the reference runner |
-| Scape MCP server | Exposes game tools, protects the bearer and maintains presence | Owner's computer or server; `@scape-wtf/agent-mcp` |
-| Agent gateway | Enforces pairing, permissions, observations and actions; holds the room connection | Scape backend; `packages/server/src/agents` |
-| Room authority | Validates live presence and movement | Existing room Worker |
+| Component           | Responsibility                                                                     | Location                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Agent host / runner | Runs the model, decision loop and memory; acts as the MCP client                   | Owner's computer or server; [Moss](../moss-agent/README.md) is the reference runner |
+| Scape MCP server    | Exposes game tools, protects the bearer and maintains presence                     | Owner's computer or server; `@scape-wtf/agent-mcp`                                  |
+| Agent gateway       | Enforces pairing, permissions, observations and actions; holds the room connection | Scape backend; `packages/server/src/agents`                                         |
+| Room authority      | Validates live presence and movement                                               | Existing room Worker                                                                |
 
 The connection is **agent host → MCP over stdio → Scape MCP server → HTTPS →
 agent gateway → existing room transport → room authority**. Loopback HTTP is
 available for local fixtures. There is no hosted MCP endpoint in this alpha.
 `transport.mjs` is the internal HTTP client. `diagnostics.mjs` supplies the retained
 `scape-agent` diagnostic command and root `yarn agent` alias; see the
-[internal HTTP and diagnostics reference](transport.md). The Gizmo
+advanced transport reference. The Gizmo
 SDK authors world objects and remains separate. “Agent harness” describes a
 runner's execution and tool loop, not the name of this entire integration.
 
@@ -109,10 +109,7 @@ The generated paths depend on the installation. These are placeholders:
   "mcpServers": {
     "scape": {
       "command": "/absolute/path/to/node",
-      "args": [
-        "/absolute/path/to/installed/scape-agent-mcp/cli.mjs",
-        "https://scape.wtf"
-      ]
+      "args": ["/absolute/path/to/installed/scape-agent-mcp/cli.mjs", "https://scape.wtf"]
     }
   }
 }
@@ -146,25 +143,25 @@ An existing scoped grant can optionally be supplied by the operator through
 
 ## Tools
 
-| Tool | Purpose |
-| --- | --- |
-| `scape_pair` | Request a code for a named runner; owner approval is separate |
-| `scape_enter` | Enter only the world approved for this grant |
-| `scape_observe` | Read public nearby state; optionally wait for a revision change |
-| `scape_speak` | Show a text bubble, at most 320 characters |
-| `scape_move_to` | Walk to an integer grid cell on the current floor |
-| `scape_stop` | Cancel queued movement and clear speech |
-| `scape_leave` | Leave and stop the connection's heartbeat |
-| `scape_step` | One adjacent authoritative step for continuous controllers |
-| `scape_interact` | Use an adjacent piano, conveyor, portal or floor entrance by observed object ID |
-| `scape_expression` | Select a named expression registered for your avatar |
-| `scape_avatar_files` | List files in the owner-configured avatar folder |
-| `scape_set_avatar` | Choose an emoji, image, GLB or public catalog preset; register custom expression frames |
-| `scape_world_status` | Check potential occupancy of the approved world without entering |
-| `scape_follow` | Track a player at two-cell distance, including usable same-world travel |
-| `scape_approach` | Approach a player, then stop within two cells |
-| `scape_guide` | Query the shared game handbook; an empty query lists topics |
-| `scape_avatar_catalog` | List optional public artwork presets and their expressions |
+| Tool                   | Purpose                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| `scape_pair`           | Request a code for a named runner; owner approval is separate                           |
+| `scape_enter`          | Enter only the world approved for this grant                                            |
+| `scape_observe`        | Read public nearby state; optionally wait for a revision change                         |
+| `scape_speak`          | Show a text bubble, at most 320 characters                                              |
+| `scape_move_to`        | Walk to an integer grid cell on the current floor                                       |
+| `scape_stop`           | Cancel queued movement and clear speech                                                 |
+| `scape_leave`          | Leave and stop the connection's heartbeat                                               |
+| `scape_step`           | One adjacent authoritative step for continuous controllers                              |
+| `scape_interact`       | Use an adjacent piano, conveyor, portal or floor entrance by observed object ID         |
+| `scape_expression`     | Select a named expression registered for your avatar                                    |
+| `scape_avatar_files`   | List files in the owner-configured avatar folder                                        |
+| `scape_set_avatar`     | Choose an emoji, image, GLB or public catalog preset; register custom expression frames |
+| `scape_world_status`   | Check potential occupancy of the approved world without entering                        |
+| `scape_follow`         | Track a player at two-cell distance, including usable same-world travel                 |
+| `scape_approach`       | Approach a player, then stop within two cells                                           |
+| `scape_guide`          | Query the shared game handbook; an empty query lists topics                             |
+| `scape_avatar_catalog` | List optional public artwork presets and their expressions                              |
 
 `scape_observe` accepts `afterRevision` and `waitMs` (up to 25,000). A timeout
 returns the current snapshot, even if unchanged. Observe again to continue;
@@ -233,14 +230,14 @@ icons for custom GLBs currently use the selected fallback emoji.
 For example, these are ordinary MCP tool arguments:
 
 ```json
-{"kind":"glb","emoji":"🦊","asset":"scout.glb"}
+{ "kind": "glb", "emoji": "🦊", "asset": "scout.glb" }
 ```
 
 After the five-second avatar-update cooldown, register an expression by calling
 `scape_set_avatar` again:
 
 ```json
-{"kind":"image","asset":"happy.png","emoji":"😄","expression":"happy"}
+{ "kind": "image", "asset": "happy.png", "emoji": "😄", "expression": "happy" }
 ```
 
 Then call `scape_expression` with `{"expression":"happy"}`. Switching registered
@@ -278,6 +275,8 @@ The repository package's `prepack` regenerates the contract before distribution.
 Moss consumes the exported types and resolves the MCP `./cli` export instead of
 reaching across the workspace by a hard-coded source path.
 
+## Contributor/source-workspace notes
+
 ## Development and verification
 
 `yarn test:agents` includes this adapter's lifecycle tests, the existing gateway
@@ -288,13 +287,9 @@ pairing, observations, actions, validation, secret exclusion and shutdown leave.
 No browser, live room or model provider is used by these adapter tests.
 
 This package depends on the official MCP server SDK and Zod. Its internal HTTP
-transport is dependency-free and is not a public package export.
-The official MCP client SDK is a development-only test dependency. Install from
-the monorepo or an exported kit with Yarn; do not publish these packages yet. The
-initial `yarn sdk:starter <new-directory>` export requires repository access and
-includes `scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz`.
-Keep all three archives and the exported Yarn resolutions together. Public third-party
-dependencies still require installation. See the [CLI guide](../scape-cli/README.md).
+transport is dependency-free and is not a public package export. Install the
+published package with `npm install @scape-wtf/agent-mcp` or use
+`scape agent mcp config` to generate a host configuration. See the [CLI package](https://www.npmjs.com/package/@scape-wtf/cli).
 
 Protocol references: [official MCP server guide](https://modelcontextprotocol.io/docs/develop/build-server)
 and [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).

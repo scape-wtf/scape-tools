@@ -24,11 +24,11 @@ export const fan = defineObject<FanState>({
     record(state) &&
     exactKeys(state, ['on', 'direction']) &&
     typeof state.on === 'boolean' &&
-    directions.some((direction) => direction === state.direction),
+    directions.some(direction => direction === state.direction),
   walkable: true,
   // No step callback is needed. Returning null stops pushing without changing walkability.
   // Opposing input stays allowed, unlike the conveyor's one-way surface.
-  push: (state) => (state.on ? { direction: state.direction } : null),
+  push: state => (state.on ? { direction: state.direction } : null),
   actions: {
     toggle: {
       permission: 'participant',
@@ -41,7 +41,7 @@ export const fan = defineObject<FanState>({
       permission: 'editor',
       run: (state, payload) => {
         requirePayload(payload, ['direction']);
-        if (!directions.some((direction) => direction === payload.direction))
+        if (!directions.some(direction => direction === payload.direction))
           throw new ObjectActionError(400, 'Choose a direction.');
         return { ...state, direction: payload.direction as FanState['direction'] };
       },
@@ -56,7 +56,7 @@ export const fan = defineObject<FanState>({
         label: 'Direction',
         kind: 'select',
         value: state.direction,
-        options: directions.map((value) => ({
+        options: directions.map(value => ({
           value,
           label: value[0].toUpperCase() + value.slice(1),
         })),

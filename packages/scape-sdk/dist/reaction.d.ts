@@ -32,9 +32,11 @@ export interface GizmoReaction {
         radiusCells: number;
     };
 }
+/** Host context available while resolving cosmetic action feedback. */
 export interface GizmoReactionContext {
     now: number;
 }
+/** Optional bounded interaction metadata for host-directed feedback. */
 export interface GizmoInteraction {
     tap?: ObjectAction;
     bump?: ObjectAction;

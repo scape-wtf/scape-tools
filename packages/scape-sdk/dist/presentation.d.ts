@@ -1,25 +1,44 @@
 /** JSON-only presentation data. The host owns rendering, time and audio devices. */
+/** A normalized quaternion in `[x, y, z, w]` order. */
 export type Quaternion = [number, number, number, number];
+/** One host-rendered pose and shadow sample in a presentation timeline. */
 export interface GizmoFrame {
+    /** Model orientation. */
     rotation: Quaternion;
+    /** Horizontal world position offset. */
     x: number;
+    /** Vertical lift above the authored placement. */
     lift: number;
+    /** Shadow width, height, and opacity. */
     shadow: [number, number, number];
 }
+/** A named, bounded cosmetic animation timeline. */
 export interface GizmoTimeline {
+    /** Stable animation key used by the host to replace a prior timeline. */
     key: string;
+    /** Start time relative to the accepted state change, in milliseconds. */
     at: number;
+    /** Timeline duration in milliseconds. */
     durationMs: number;
+    /** Ordered model frames sampled by the host. */
     frames: GizmoFrame[];
+    /** Optional numeric payload for host label or effect selection. */
     number?: number;
 }
+/** One sampled label transform in a presentation effect. */
 export interface GizmoLabelFrame {
+    /** Horizontal scale. */
     scaleX: number;
+    /** Vertical scale. */
     scaleY: number;
+    /** Rotation in radians. */
     rotation: number;
+    /** Vertical offset. */
     y: number;
+    /** Opacity from 0 to 1. */
     opacity: number;
 }
+/** Embedded model presentation settings consumed by the host renderer. */
 export interface GizmoPresentation {
     model: string;
     textureSize: number;

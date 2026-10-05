@@ -1,6 +1,6 @@
 {
   "name": "@scape-wtf/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -24,8 +24,8 @@
     "scape": "./cli.mjs"
   },
   "dependencies": {
-    "esbuild": "0.28.1",
-    "@scape-wtf/agent-mcp": "0.1.0"
+    "@scape-wtf/agent-mcp": "0.1.1",
+    "esbuild": "0.28.1"
   },
   "description": "Scape command-line tools for gizmo projects, persistent agents and MCP testing",
   "repository": {

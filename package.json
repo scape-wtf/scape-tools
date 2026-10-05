@@ -5,7 +5,13 @@
     "packages/*",
     "examples/gizmos/*"
   ],
+  "scripts": {
+    "format": "prettier --write --config .prettierrc.json packages/shared/src/types/Agent.ts packages/shared/src/types/RoomTransport.ts packages/scape-sdk/src packages/scape-sdk/test packages/scape-cli packages/scape-agent-mcp examples/gizmos",
+    "check:format": "prettier --check --config .prettierrc.json packages/shared/src/types/Agent.ts packages/shared/src/types/RoomTransport.ts packages/scape-sdk/src packages/scape-sdk/test packages/scape-cli packages/scape-agent-mcp examples/gizmos",
+    "check:shared-types": "tsc --noEmit --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --strict packages/shared/src/types/Agent.ts packages/shared/src/types/RoomTransport.ts"
+  },
   "devDependencies": {
+    "prettier": "^3.6.2",
     "typescript": "^5.3.0"
   }
 }

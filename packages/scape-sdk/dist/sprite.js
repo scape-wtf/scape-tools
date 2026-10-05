@@ -10,7 +10,10 @@ export function gizmoSpriteError(value) {
     error = effectNumber(sprite.size, 'sprite.size', 64, 512);
     if (error)
         return error;
-    if (!Number.isInteger(sprite.size) || !Array.isArray(sprite.layers) || !sprite.layers.length || sprite.layers.length > 4)
+    if (!Number.isInteger(sprite.size) ||
+        !Array.isArray(sprite.layers) ||
+        !sprite.layers.length ||
+        sprite.layers.length > 4)
         return 'sprite requires an integer size and 1–4 layers.';
     const ids = new Set();
     for (const layer of sprite.layers) {
@@ -23,21 +26,51 @@ export function gizmoSpriteError(value) {
         if (!Array.isArray(layer.shapes) || !layer.shapes.length || layer.shapes.length > 16)
             return 'sprite layers support 1–16 shapes.';
         for (const shape of layer.shapes) {
-            error = effectRecord(shape, 'sprite.shape', ['kind', 'x', 'y', 'width', 'height', 'radius', 'fill', 'text', 'size', 'weight', 'color'])
-                ?? effectNumber(shape.x, 'sprite.shape.x', 0, sprite.size) ?? effectNumber(shape.y, 'sprite.shape.y', 0, sprite.size);
+            error =
+                effectRecord(shape, 'sprite.shape', [
+                    'kind',
+                    'x',
+                    'y',
+                    'width',
+                    'height',
+                    'radius',
+                    'fill',
+                    'text',
+                    'size',
+                    'weight',
+                    'color',
+                ]) ??
+                    effectNumber(shape.x, 'sprite.shape.x', 0, sprite.size) ??
+                    effectNumber(shape.y, 'sprite.shape.y', 0, sprite.size);
             if (error)
                 return error;
             if (shape.kind === 'text') {
-                error = effectRecord(shape, 'sprite.text', ['kind', 'x', 'y', 'text', 'size', 'weight', 'color'])
-                    ?? effectNumber(shape.size, 'sprite.text.size', 4, 64);
+                error =
+                    effectRecord(shape, 'sprite.text', [
+                        'kind',
+                        'x',
+                        'y',
+                        'text',
+                        'size',
+                        'weight',
+                        'color',
+                    ]) ?? effectNumber(shape.size, 'sprite.text.size', 4, 64);
                 if (error)
                     return error;
-                if (typeof shape.text !== 'string' || shape.text.length > 64 || /[\u0000-\u001f\u007f]/.test(shape.text) || ![400, 600].includes(shape.weight) || !color(shape.color))
+                if (typeof shape.text !== 'string' ||
+                    shape.text.length > 64 ||
+                    /[\u0000-\u001f\u007f]/.test(shape.text) ||
+                    ![400, 600].includes(shape.weight) ||
+                    !color(shape.color))
                     return 'Invalid sprite text.';
             }
             else if (shape.kind === 'rect' || shape.kind === 'marker') {
-                error = effectRecord(shape, 'sprite.shape', shape.kind === 'rect' ? ['kind', 'x', 'y', 'width', 'height', 'radius', 'fill'] : ['kind', 'x', 'y', 'width', 'height'])
-                    ?? effectNumber(shape.width, 'sprite.shape.width', 1, sprite.size) ?? effectNumber(shape.height, 'sprite.shape.height', 1, sprite.size);
+                error =
+                    effectRecord(shape, 'sprite.shape', shape.kind === 'rect'
+                        ? ['kind', 'x', 'y', 'width', 'height', 'radius', 'fill']
+                        : ['kind', 'x', 'y', 'width', 'height']) ??
+                        effectNumber(shape.width, 'sprite.shape.width', 1, sprite.size) ??
+                        effectNumber(shape.height, 'sprite.shape.height', 1, sprite.size);
                 if (error)
                     return error;
                 if (shape.x + shape.width > sprite.size || shape.y + shape.height > sprite.size)
@@ -54,8 +87,12 @@ export function gizmoSpriteError(value) {
                         error = effectRecord(shape.fill, 'sprite.fill', ['from', 'to', 'y']);
                         if (error)
                             return error;
-                        if (!color(shape.fill.from) || !color(shape.fill.to) || !Array.isArray(shape.fill.y) || shape.fill.y.length !== 2
-                            || shape.fill.y.some(y => effectNumber(y, 'gradient.y', 0, sprite.size)) || shape.fill.y[1] <= shape.fill.y[0])
+                        if (!color(shape.fill.from) ||
+                            !color(shape.fill.to) ||
+                            !Array.isArray(shape.fill.y) ||
+                            shape.fill.y.length !== 2 ||
+                            shape.fill.y.some(y => effectNumber(y, 'gradient.y', 0, sprite.size)) ||
+                            shape.fill.y[1] <= shape.fill.y[0])
                             return 'Invalid sprite gradient.';
                     }
                 }
@@ -71,20 +108,30 @@ export function gizmoSpriteAnimationError(value) {
     if (error)
         return error;
     const animation = value;
-    if (!id(animation.layer) || !Array.isArray(animation.frames) || animation.frames.length < 2 || animation.frames.length > 16)
+    if (!id(animation.layer) ||
+        !Array.isArray(animation.frames) ||
+        animation.frames.length < 2 ||
+        animation.frames.length > 16)
         return 'Sprite animation requires a layer and 2–16 frames.';
     let previous = -1;
     for (const frame of animation.frames) {
-        error = effectRecord(frame, 'sprite frame', ['at', 'offset', 'tint', 'curve']) ?? effectNumber(frame.at, 'sprite frame.at', 0, 1);
+        error =
+            effectRecord(frame, 'sprite frame', ['at', 'offset', 'tint', 'curve']) ??
+                effectNumber(frame.at, 'sprite frame.at', 0, 1);
         if (error)
             return error;
         if (frame.at <= previous)
             return 'Sprite frame times must increase.';
         previous = frame.at;
-        if (!Array.isArray(frame.offset) || frame.offset.length !== 2 || frame.offset.some(n => effectNumber(n, 'sprite offset', -.5, .5))
-            || !Array.isArray(frame.tint) || frame.tint.length !== 3 || frame.tint.some(n => effectNumber(n, 'sprite tint', 0, 1)))
+        if (!Array.isArray(frame.offset) ||
+            frame.offset.length !== 2 ||
+            frame.offset.some(n => effectNumber(n, 'sprite offset', -0.5, 0.5)) ||
+            !Array.isArray(frame.tint) ||
+            frame.tint.length !== 3 ||
+            frame.tint.some(n => effectNumber(n, 'sprite tint', 0, 1)))
             return 'Invalid sprite transform.';
-        if (frame.curve !== undefined && !['linear', 'out-cubic', 'out-quadratic'].includes(frame.curve))
+        if (frame.curve !== undefined &&
+            !['linear', 'out-cubic', 'out-quadratic'].includes(frame.curve))
             return 'Invalid sprite curve.';
     }
     if (animation.frames[0].at !== 0 || animation.frames.at(-1).at !== 1)
@@ -97,8 +144,11 @@ export function spriteAnimationFrame(animation, progress) {
         return right === 0 ? animation.frames[0] : animation.frames.at(-1);
     const a = animation.frames[right - 1], b = animation.frames[right], t = (progress - a.at) / (b.at - a.at);
     const mix = b.curve === 'out-cubic' ? 1 - (1 - t) ** 3 : b.curve === 'out-quadratic' ? 1 - (1 - t) ** 2 : t;
-    return { at: progress, offset: a.offset.map((v, i) => v + (b.offset[i] - v) * mix),
-        tint: a.tint.map((v, i) => v + (b.tint[i] - v) * mix) };
+    return {
+        at: progress,
+        offset: a.offset.map((v, i) => v + (b.offset[i] - v) * mix),
+        tint: a.tint.map((v, i) => v + (b.tint[i] - v) * mix),
+    };
 }
 const cache = new WeakMap();
 export function resolveGizmoSprite(definition, state) {

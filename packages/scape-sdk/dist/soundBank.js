@@ -6,7 +6,7 @@ export function gizmoPreviewError(value) {
     if (shape)
         return shape;
     const preview = value;
-    return effectNumber(preview.gain, 'preview.gain', 0, 1) ?? gizmoSoundsError({ preview: preview.sound });
+    return (effectNumber(preview.gain, 'preview.gain', 0, 1) ?? gizmoSoundsError({ preview: preview.sound }));
 }
 const cache = new WeakMap();
 /** State-dependent recipes are prepared/cached by the host; synthesis never runs in a definition callback. */
