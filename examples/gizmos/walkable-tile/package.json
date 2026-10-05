@@ -1,0 +1,21 @@
+{
+  "name": "scape-walkable-tile-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "dev": "node ../../../packages/scape-cli/cli.mjs gizmo dev",
+    "test": "yarn build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@scape-wtf/sdk": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@scape-wtf/cli": "0.1.0"
+  },
+  "scape": {
+    "entry": "src/project.ts"
+  }
+}

@@ -18,3 +18,8 @@ jobs:
       - run: npm test --workspace=@scape-wtf/sdk
       - run: npm test --workspace=@scape-wtf/cli
       - run: npm test --workspace=@scape-wtf/agent-mcp
+      - name: Build examples
+        run: |
+          for example in examples/gizmos/*; do
+            npm run build --prefix "$example"
+          done

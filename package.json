@@ -2,7 +2,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/gizmos/*"
   ],
   "devDependencies": {
     "typescript": "^5.3.0"
