@@ -3,8 +3,7 @@
 Gizmos are things you place in Scape that do something. The current API defines them with
 `defineObject` and collects them with `defineProject({ objects: [...] })`.
 
-A dependency-free ESM package for defining Scape gizmos. Version 0.1.0 is local and
-published under the `@scape-wtf` scope; releases remain experimental until a
+A dependency-free ESM package for defining Scape gizmos. Version 0.1.0 is published under the `@scape-wtf` scope; releases remain experimental until a
 stable compatibility policy is declared.
 The standalone starter and CLI require Node 22 or newer.
 
@@ -98,7 +97,7 @@ A project default-exports `defineProject({ objects: [first, second] })`. The cur
 host accepts up to 16 gizmos, validates the entire update before activation and retains
 independent state per placed instance. Types and emojis must be unique; remove placed
 instances before removing a definition. Single-gizmo default exports remain compatible.
-The interface is experimental and may change before public distribution.
+The interface is experimental and may change before a stable compatibility policy is declared.
 
 From the Scape repository, run `yarn build:sdk` after editing this package. Normal root
 installation, game build, development start and typecheck build it automatically.
@@ -106,8 +105,7 @@ installation, game build, development start and typecheck build it automatically
 with packed copies of this SDK and the development command. The destination's parent directory must already exist.
 Use `--template voting-booth` for the optional worked example. The blank project has empty
 state and no actions; `src/project.ts` collects definitions to register in your private
-world. See the [developer guide](../../docs/developer-playground.md) for reserved names/emojis,
-connection approval and compatibility rules. No package is published and no separate repository is created.
+world. See the [developer guide](../../docs/developer-playground.md) for reserved names/emojis, connection approval and compatibility rules. Public packages are available from npm; the source workspace remains canonical.
 
 Gizmos can also declare models, animation, interaction and independent audio through the experimental
 [presentation contract](../../docs/gizmo-presentation.md). The SDK contains the JSON types,
@@ -228,7 +226,7 @@ into an arrow. Saved drops retain the overlay and declared portable configuratio
 
 ### Updating local prototypes
 
-This replaces the earlier unpublished `conveyor` property. Change it to
+This replaces the earlier `conveyor` property. Change it to
 `walkable: true` plus `push: () => ({ direction, blockOpposingInput: true })`.
 Existing `step` definitions must declare walkability explicitly and check
 `event.movement === 'push'` for transported arrivals. Rebuild and upload paired

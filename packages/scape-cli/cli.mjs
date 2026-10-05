@@ -3,11 +3,13 @@ import { terminal } from './terminal.mjs';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+export const DEFAULT_ORIGIN = "https://scape.wtf";
+
 const help = `Scape CLI — gizmo projects and persistent agents
 
 Usage:
   scape gizmo init <new-directory>
-  scape gizmo dev --origin <https-url>
+  scape gizmo dev [--origin <https-url>]
   scape agent run [--origin <https-url>]
   scape agent configure [--origin <https-url>]
   scape agent login [--origin <https-url>]
@@ -15,13 +17,13 @@ Usage:
   scape agent memory [list|clear|enable|disable]
   scape agent memory forget <visitor-id>
   scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]
-  scape agent run --project <directory> --origin <https-url>
-  scape agent mcp config --origin <https-url>
-  scape agent mcp serve --origin <https-url>
+  scape agent run --project <directory> [--origin <https-url>]
+  scape agent mcp config [--origin <https-url>]
+  scape agent mcp serve [--origin <https-url>]
 
 Aliases: scape init, scape dev
 
-Gizmo development pairs with your private developer world and uploads changes.
+Gizmo development connects to your Scape developer world at https://scape.wtf by default and uploads changes. Use --origin for another host.
 Agent run walks you through setup and pairing, then keeps your agent listening.
 Settings and access are saved locally. No agent project or install step required.
 Providers: openai, anthropic, openrouter, xai, gemini, ollama, lmstudio, openai-compatible.
@@ -53,7 +55,7 @@ export async function main(args = process.argv.slice(2)) {
     const {initAgentProject}=await import('./agent.mjs');
     const ui = terminal(); ui.heading('Agent code project');
     const output=await initAgentProject(rest[1],options);
-    ui.success(`Created ${output}. Run yarn install there, set your provider/model and environment key, then yarn agent --origin https://your-scape-host.`);
+    ui.success(`Created ${output}. Run npm install there, set your provider/model and environment key, then npm run agent.`);
     return;
   }
   if (domain === 'agent' && (!rest.length || ['run','configure','login','status','init'].includes(rest[0]))) {
@@ -63,7 +65,8 @@ export async function main(args = process.argv.slice(2)) {
       if (!key || !rest[i + 1] || rest[i + 1].startsWith('--') || key in options) throw new Error(`Unknown command or invalid arguments.\n\n${help}`);
       options[key] = rest[i + 1];
     }
-    if (command === 'status' && Object.keys(options).length || options.project && (command !== 'run' || !options.origin)) throw new Error(`Unknown command or invalid arguments.\n\n${help}`);
+    if (options.project) options.origin ||= DEFAULT_ORIGIN;
+    if (command === "status" && Object.keys(options).length || options.project && command !== "run") throw new Error(`Unknown command or invalid arguments.\n\n${help}`);
     if (options.project) {
       const { runAgent } = await import('@scape-wtf/agent-mcp/runner');
       const ui = terminal(); ui.heading('Your agent, in Scape.');
@@ -80,18 +83,19 @@ export async function main(args = process.argv.slice(2)) {
     const { initProject } = await import('./init.mjs');
     const ui = terminal(); ui.heading('New Gizmo project'); ui.busy('Preparing your project');
     let output; try { output = await initProject(gizmoArgs[1]); } finally { ui.clear(); }
-    ui.success(`Created ${output}. Run yarn install, yarn build, then yarn dev --origin https://your-scape-host.`);
+    ui.success(`Created ${output}. Run npm install, npm run build, then npm run dev.`);
     return;
   }
-  if (gizmoArgs[0] === 'dev' && gizmoArgs.length === 3 && gizmoArgs[1] === '--origin') {
+  if (gizmoArgs[0] === 'dev' && (gizmoArgs.length === 1 || gizmoArgs.length === 3 && gizmoArgs[1] === '--origin')) {
     const { dev } = await import('./gizmo.mjs');
-    await dev(process.cwd(), gizmoArgs[2]);
+    await dev(process.cwd(), gizmoArgs.length === 1 ? DEFAULT_ORIGIN : gizmoArgs[2]);
     return;
   }
-  if (domain === 'agent' && rest.length === 4 && rest[0] === 'mcp'
-    && ['config', 'serve'].includes(rest[1]) && rest[2] === '--origin') {
-    const { main: agentMain } = await import('@scape-wtf/agent-mcp/cli');
-    await agentMain(rest[1] === 'config' ? ['--config', rest[3]] : [rest[3]]);
+  if (domain === "agent" && rest[0] === "mcp" && ["config", "serve"].includes(rest[1])
+    && (rest.length === 2 || rest.length === 4 && rest[2] === "--origin")) {
+    const { main: agentMain } = await import("@scape-wtf/agent-mcp/cli");
+    const origin = rest.length === 2 ? DEFAULT_ORIGIN : rest[3];
+    await agentMain(rest[1] === "config" ? ["--config", origin] : [origin]);
     return;
   }
   throw new Error(`Unknown command or invalid arguments.\n\n${help}`);

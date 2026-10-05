@@ -3,10 +3,9 @@
 Gizmos are things you place in Scape that do something. The current API defines them with
 `defineObject` and collects them with `defineProject({ objects: [...] })`.
 
-Run `yarn install`, then `yarn build` to check your definition. Connect with
-`yarn dev --origin https://your-scape-host` (use your actual Scape deployment).
-That script runs `scape gizmo dev`; the direct form is
-`yarn scape gizmo dev --origin https://your-scape-host`.
+Run `npm install`, then `npm run build` to check your definition. Connect with
+`npm run dev` to connect to your Scape developer world at https://scape.wtf. Use `--origin` only for another host.
+That script runs `scape gizmo dev`; the public CLI is already included in the generated project.
 Open the printed link, sign in, and approve the matching connection code in your
 private developer world. Select **My gizmo** in the developer sidebar or the
 placement palette, place it, and open it. Saving source changes updates the preview.
@@ -41,26 +40,23 @@ normal world tools remain available in the game. Disconnecting stops updates but
 keeps your world and last uploaded build. Developer worlds are private, limited to
 one per account, marked after 90 days without a visit and removed after 120 days.
 
-## Kit and agent commands
+## Agent and source-kit commands
 
-Packages are currently unpublished. Repository exports include three private archives
-in `vendor/`: `scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz`.
-Keep them and the manifest's Yarn resolutions with the project. Public third-party
-dependencies still need installation; the kit is not fully offline.
+The generated project uses the published npm packages. Repository exports may include local archives for source contributors; keep those archives and the manifest.s Yarn resolutions together when working from a source kit.
 
-With dependencies installed, `yarn scape gizmo init /path/to/another-project` creates
+With dependencies installed, `scape gizmo init /path/to/another-project` creates
 another blank project and carries all three archives forward. The destination must be
 new and its parent must exist. `scape init` and `scape dev` remain compatibility aliases.
 
 This kit also supports agent setup without a Scape source checkout:
 
 ```sh
-yarn --silent scape agent mcp config --origin https://your-scape-host
+scape agent mcp config
 ```
 
 Copy the generated absolute Node command and arguments into your MCP host. Do not
 replace the command with Yarn, whose output can interfere with stdio MCP. Your host
 supplies the agent model and decision loop. Agent approval in Settings → Developer → Agents is
 separate from this project's Gizmo upload grant. The canonical direct server command
-is `scape agent mcp serve --origin https://your-scape-host`; it starts the MCP server,
+is `scape agent mcp serve`; it starts the MCP server,
 not a model. Run `yarn scape --help` for the command summary.

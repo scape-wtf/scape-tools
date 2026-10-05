@@ -1,10 +1,8 @@
 # Voting booth starter
 
-Inside this repository, you can run `yarn dev --origin <Scape origin>` directly
-from this example directory after the root dependencies are installed. `yarn build`
-and `yarn test` also use the repository tools. Do not install the unpublished
-packages from the registry here. Export with `yarn sdk:starter` for an independent
-project; the exporter switches its scripts to the locally installed SDK tools.
+Inside this repository, you can run `npm run dev` directly
+from this example directory after the root dependencies are installed. `npm run build`
+and `npm test` also use the repository tools. The public packages are available from npm. For an independent project, use `npx @scape-wtf/cli@latest gizmo init my-gizmo`; source contributors can still use the repository exporter.
 
 Gizmos are things you place in Scape that do something. The current API defines them with
 `defineObject` and collects them with `defineProject({ objects: [...] })`.
@@ -12,27 +10,22 @@ Gizmos are things you place in Scape that do something. The current API defines 
 Build and test a Scape gizmo using only the SDK. This project does not need the game
 source, a Scape account, a running world, a tunnel or a VPN.
 
-Before public distribution, export a copy from the Scape repository:
+For a public project, scaffold directly with the published CLI:
 
 ```sh
-yarn sdk:starter /path/to/new-project --template voting-booth
+npx @scape-wtf/cli@latest gizmo init my-project
 ```
 
-Choose a new directory whose parent already exists. The export includes
-`vendor/scape-sdk.tgz`, `vendor/scape-cli.tgz` and `vendor/scape-agent-mcp.tgz`. The manifest points to the local SDK/CLI archives and
-uses a Yarn resolution for the private transitive MCP dependency. Keep all three
-archives and those resolutions together. There is no public `@scape-wtf/sdk` release;
-public third-party dependencies still need installation.
-The checked-in template's version dependency is replaced during export.
+Choose a new directory that does not already exist. The generated project uses the published SDK and CLI packages.
 
-In the exported project (Node 22+ and Yarn 1):
+In the generated project (Node 22+ and npm):
 
 ```sh
-yarn install
-yarn test
+npm install
+npm test
 ```
 
-Edit `src/definition.ts`, then run `yarn test` again. `yarn build` produces plain ESM
+Edit `src/definition.ts`, then run `npm test` again. `npm run build` produces plain ESM
 and declarations in `dist`. Tests exercise two voters, changing a vote, saved state,
 editor permission, stale rounds, malformed input and declarative controls. The local
 `ObjectRegistry` is the same validation runtime used by Scape; actors and permissions
@@ -47,11 +40,11 @@ old submissions are rejected.
 To see edits in your private developer world, run:
 
 ```sh
-yarn dev --origin https://your-scape-host
+npm run dev
 ```
 
 The exported `dev` script runs `scape gizmo dev`. The same installed kit also
-supports `yarn --silent scape agent mcp config --origin https://your-scape-host`;
+supports `scape agent mcp config`;
 agent pairing is separate from this project's upload grant.
 
 For a local desktop Scape server, use `http://127.0.0.1:3000`. Open the printed link,

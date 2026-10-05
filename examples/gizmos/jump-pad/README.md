@@ -9,6 +9,6 @@ offset and landing offsets in `src/definition.ts` to try other movement patterns
 The host validates movement, cooldown and collisions; the recipe cannot switch
 worlds or floors or move someone else.
 
-Run `yarn build`, `yarn test`, or `yarn dev --origin <Scape origin>` here.
+Run `npm run build`, `npm test`, or `npm run dev` here.
 The example is included in every developer-world sidebar and palette.
 Export it with `yarn sdk:starter /absolute/path/jump-pad --template jump-pad`.

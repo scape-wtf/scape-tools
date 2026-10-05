@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "typescript": "^5.3.0",
-    "@scape-wtf/cli": "0.1.0"
+    "@scape-wtf/cli": "0.1.1"
   },
   "scape": {
     "entry": "src/project.ts"

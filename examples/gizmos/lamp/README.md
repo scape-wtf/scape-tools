@@ -1,10 +1,8 @@
 # SDK lamp example
 
-Inside this repository, you can run `yarn dev --origin <Scape origin>` directly
-from this example directory after the root dependencies are installed. `yarn build`
-and `yarn test` also use the repository tools. Do not install the unpublished
-packages from the registry here. Export with `yarn sdk:starter` for an independent
-project; the exporter switches its scripts to the locally installed SDK tools.
+Inside this repository, you can run `npm run dev` directly
+from this example directory after the root dependencies are installed. `npm run build`
+and `npm test` also use the repository tools. The public packages are available from npm. For an independent project, use `npx @scape-wtf/cli@latest gizmo init my-gizmo`; source contributors can still use the repository exporter.
 
 An independent interactive lamp, included by default in developer worlds and excluded from ordinary worlds. Anyone in the
 world can switch a lamp on or off; its editor can choose Warm, Blue or Pink.
@@ -34,11 +32,10 @@ To edit its source independently, export a standalone project from the repositor
 yarn sdk:starter /absolute/path/my-lamp --template lamp
 ```
 
-In that new directory, run `yarn install`, `yarn test`, then
-`yarn dev --origin https://your-scape-host`. Approve pairing in your developer
+In that new directory, run `npm install`, `npm test`, then
+`npm run dev`. Approve pairing in your developer
 world and place **Lamp**. `src/definition.ts` owns colors, controls and permissions;
-`src/project.ts` registers the gizmo. The SDK and CLI remain unpublished and are
-included as local package archives by the exporter.
+`src/project.ts` registers the gizmo. The SDK and CLI are published packages. Source exports may still include local archives for repository contributors.
 
 Review on both floors: switch on/off, choose colors, place several lamps beside
 Fire and Disco, move/remove them, pan away/back, and reload to verify saved state.

@@ -2,8 +2,8 @@ import { cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Every unpublished dependency must travel with the exported kit. Yarn resolutions
-// keep transitive private packages on these archives instead of the public registry.
+// Local kit dependencies travel with the exported kit. Yarn resolutions
+// keep those archives together for source contributors.
 export const kitPackages = ['scape-sdk', 'scape-cli', 'scape-agent-mcp'];
 
 export function useKitArchives(manifest) {
@@ -17,7 +17,7 @@ export function useKitArchives(manifest) {
 
 export function useRegistryPackages(manifest) {
   manifest.dependencies['@scape-wtf/sdk'] = '^0.1.0';
-  manifest.devDependencies['@scape-wtf/cli'] = '^0.1.0';
+  manifest.devDependencies['@scape-wtf/cli'] = '^0.1.1';
   delete manifest.resolutions;
 }
 
@@ -33,7 +33,7 @@ export async function initProject(destination) {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   manifest.name = path.basename(output).toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 60) || 'my-scape-project';
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-  // When invoked from an exported project, carry its unpublished packages along.
+  // When invoked from an exported project, carry its local kit packages along.
   const cliRoot = fileURLToPath(new URL('./', import.meta.url));
   const candidates = [path.resolve(cliRoot, '../../..', 'vendor'), path.resolve(process.cwd(), 'vendor')];
   for (const vendor of candidates) {

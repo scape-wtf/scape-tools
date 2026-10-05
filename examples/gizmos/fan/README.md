@@ -1,10 +1,8 @@
 # Floor fan
 
-Inside this repository, you can run `yarn dev --origin <Scape origin>` directly
-from this example directory after the root dependencies are installed. `yarn build`
-and `yarn test` also use the repository tools. Do not install the unpublished
-packages from the registry here. Export with `yarn sdk:starter` for an independent
-project; the exporter switches its scripts to the locally installed SDK tools.
+Inside this repository, you can run `npm run dev` directly
+from this example directory after the root dependencies are installed. `npm run build`
+and `npm test` also use the repository tools. The public packages are available from npm. For an independent project, use `npx @scape-wtf/cli@latest gizmo init my-gizmo`; source contributors can still use the repository exporter.
 
 A standalone example of **walkability plus state-driven pushing**, using only
 `@scape-wtf/sdk`. It is available by default in the developer-world sidebar and palette.
@@ -37,8 +35,8 @@ Export an independent copy:
 yarn sdk:starter /absolute/new/fan-project --template fan
 ```
 
-Inside that copy, run `yarn install`, `yarn test`, then
-`yarn dev --origin <Scape origin>` to pair it with your developer world.
+Inside that copy, run `npm install`, `npm test`, then
+`npm run dev` to pair it with your developer world.
 The packed-consumer regression builds and tests this exact source outside the
 monorepo. Gameplay tests cover local and remote pushes, switching, direction changes,
 blocked paths and once-per-arrival pad effects. Browser/device review belongs to the owner.

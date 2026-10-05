@@ -14,9 +14,9 @@ source alongside the other object examples.
 
 Edit `src/definition.ts`; `src/project.ts` exposes it to the SDK loader.
 Scape owns permission checks, shared delivery, rendering and protected audio.
-After installing root dependencies and running `yarn build:gizmos`, run
-`yarn build` and `yarn test` here. Pair with
-`yarn dev --origin https://mac-studio.tail22994d.ts.net:3000`.
+After installing root dependencies and running `npm run build:gizmos`, run
+`npm run build` and `npm test` here. Pair with
+`npm run dev`.
 Export from the root with
 `yarn sdk:starter /absolute/path/my-chime --template chime`.
 

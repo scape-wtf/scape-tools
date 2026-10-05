@@ -23,10 +23,10 @@ test('help and argument errors work without loading compiler or MCP dependencies
     assert.match(result.stdout, /scape agent run/);
     assert.equal(result.stderr, '');
   }
-  for (const args of [['agent', 'run', '--unknown'], ['agent', 'mcp', 'serve'], ['gizmo', 'dev'], ['gizmo', 'init', 'one', 'two']]) {
+  for (const args of [["agent", "run", "--unknown"], ["agent", "mcp", "serve", "--bad"], ["gizmo", "init", "one", "two"]]) {
     const result = run(args);
     assert.equal(result.status, 1);
-    assert.equal(result.stdout, '');
+    assert.equal(result.stdout, "");
     assert.match(result.stderr, /Unknown command or invalid arguments/);
   }
 });
@@ -39,7 +39,7 @@ test('namespaced initialization and its alias scaffold the same project without 
     const result = run([...prefix, destination]);
     assert.equal(result.status, 0, result.stderr);
     const manifest = JSON.parse(await readFile(path.join(destination, 'package.json'), 'utf8'));
-    assert.equal(manifest.devDependencies['@scape-wtf/cli'], '0.1.0');
+    assert.equal(manifest.devDependencies['@scape-wtf/cli'], '0.1.1');
     assert.equal(manifest.scripts.dev, 'scape gizmo dev');
     assert.equal(manifest.scape.entry, 'src/project.ts');
     const original = await readFile(path.join(destination, 'src/project.ts'), 'utf8');

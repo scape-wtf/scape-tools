@@ -1,10 +1,19 @@
 # Scape CLI
 
 `@scape-wtf/cli` is the public Scape command-line package. Its `scape`
-binary handles Gizmo projects and persistent agents. Use Node.js 22 or newer and Yarn.
+binary handles Gizmo projects and persistent agents. Use Node.js 22 or newer. Install it with `npm install --global @scape-wtf/cli`, or run it with `npx @scape-wtf/cli@latest`.
 The CLI supplies the agent decision/tool loop; the developer supplies a model provider.
 Gizmo upload sessions
 and agent pairing/presence remain separate permissions and lifecycles.
+
+## Install
+
+```sh
+npm install --global @scape-wtf/cli
+scape --help
+```
+
+For a one-off command, use `npx @scape-wtf/cli@latest`.
 
 | Command | Purpose |
 | --- | --- |
@@ -24,7 +33,7 @@ for new documentation and scripts.
 ## Obtain and install a kit
 
 An operator with source access exports a kit with
-`yarn sdk:starter /path/to/new-project`. Exported kits contain three private archives:
+`yarn sdk:starter /path/to/new-project`. Exported source kits contain three local archives:
 `scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz` under
 `vendor/`. The manifest uses local SDK/CLI dependencies and a Yarn resolution for the transitive MCP dependency. Keep the archives and resolutions together, then run
 `yarn install` in the exported project. Public third-party dependencies still need
@@ -32,8 +41,7 @@ installation; this is not a fully offline kit. No game source or credentials are
 
 An installed kit supports both command families without a source checkout.
 `yarn scape gizmo init /path/to/another-project` carries all three archives into a new
-blank project. Initial kit export still requires repository access; packages are not
-available from a public registry.
+blank project. Initial kit export still requires repository access; public projects should use the registry packages described above.
 
 ## Persistent agents
 
@@ -96,7 +104,7 @@ and [configuration reference](../../apps/docs/content/agents/configuration.md).
 From an installed kit or source workspace:
 
 ```sh
-yarn --silent scape agent mcp config --origin https://your-scape-host
+scape agent mcp config
 ```
 
 Copy the generated command and arguments into your MCP host. They use absolute
@@ -105,7 +113,7 @@ Do not configure Yarn as the MCP command: its normal output is not protocol data
 `SCAPE_AGENT_ASSET_DIR`, when set, is included for the operator-selected avatar folder.
 Regenerate configuration if you move the installation.
 
-`scape agent mcp serve --origin https://your-scape-host` provides the equivalent
+`scape agent mcp serve` provides the equivalent
 stdio server entry through the unified CLI. It waits for an MCP client; it does not
 run an agent model. The generated configuration continues to invoke the adapter
 with Node directly. See the [MCP guide](../scape-agent-mcp/README.md) for owner
@@ -118,11 +126,11 @@ interface; the CLI does not add another gameplay protocol.
 ## Gizmo development
 
 ```sh
-yarn dev --origin https://your-scape-host
+npm run dev
 ```
 
 In exported starters and examples, `yarn dev` runs `scape gizmo dev`. Other projects can run
-`yarn scape gizmo dev --origin https://your-scape-host`. The host must run Scape's developer-link endpoints.
+`scape gizmo dev`. The command connects to https://scape.wtf by default. Use `--origin` for another Scape host.
 HTTP is accepted only for localhost. No local web server, inbound connection, VPN,
 browser-to-laptop request or tunnel is needed. Origin redirects are refused.
 

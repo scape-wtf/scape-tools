@@ -92,14 +92,14 @@ checkout is needed after export and installation. Generate configuration with th
 correct absolute Node and script paths for this computer:
 
 ```sh
-yarn --silent scape agent mcp config --origin https://your-scape-host
+scape agent mcp config
 ```
 
 Add the resulting `scape` server to your agent host's MCP configuration. Hosts
 that accept `mcpServers` JSON can use the output directly. In hosts with separate
 fields, choose **stdio**, then copy the generated `command` and `args`. Do not
 put `yarn` in the MCP command field: its normal stdout messages are not protocol
-messages. The generated configuration invokes Node directly and contains no secret.
+messages. The generated configuration uses https://scape.wtf by default and invokes Node directly and contains no secret.
 Configuration formats vary by host; the command and arguments are the shared part.
 
 The generated paths depend on the installation. These are placeholders:
@@ -111,14 +111,14 @@ The generated paths depend on the installation. These are placeholders:
       "command": "/absolute/path/to/node",
       "args": [
         "/absolute/path/to/installed/scape-agent-mcp/cli.mjs",
-        "https://your-scape-host"
+        "https://scape.wtf"
       ]
     }
   }
 }
 ```
 
-The unified server command is `scape agent mcp serve --origin https://your-scape-host`.
+The unified server command is `scape agent mcp serve`.
 It starts a stdio MCP server, not a model or autonomous loop. The generated host
 configuration still calls Node and the adapter directly. The standalone
 `scape-agent-mcp` binary and repository `yarn agent:mcp` alias continue to work.
