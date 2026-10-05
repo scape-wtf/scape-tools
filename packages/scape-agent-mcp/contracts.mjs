@@ -2,4 +2,5 @@
 export const MAX_STATUS_TEXT_LENGTH = 320;
 export const GRID = { width: 64, height: 40 };
 /** Canonical external agent contract. Keep this module independent of host packages. */
+/** Maximum display-name length accepted by the external agent gateway. */
 export const AGENT_NAME_MAX_LENGTH = 24;

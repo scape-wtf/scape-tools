@@ -19,3 +19,4 @@ documentation at https://developer.scape.wtf.
 This repository is generated from the canonical Scape workspace. Do not edit it
 as an independent implementation; release changes originate in the Scape source
 workspace and are exported here with `yarn release:export:tools`.
+
