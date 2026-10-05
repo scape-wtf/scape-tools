@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
@@ -36,7 +36,12 @@ export async function initAgentProject(destination, options = {}) {
       const target=path.join(output,'vendor',`${name}.tgz`);
       if(vendor)await cp(path.join(vendor,`${name}.tgz`),target);
       else {
-        try{await exec('yarn',['pack','--filename',target],{cwd:path.join(repoRoot,'packages',name),maxBuffer:2_000_000});}
+        try{
+          const packageDirectory=path.join(repoRoot,'packages',name);
+          const result=await exec("npm",["pack","--json","--ignore-scripts","--pack-destination",path.dirname(target)],{cwd:packageDirectory,maxBuffer:2_000_000});
+          const packed=JSON.parse(result.stdout)[0].filename;
+          await rename(path.join(path.dirname(target),packed),target);
+        }
         catch{throw new Error('Could not package the agent kit. Check the source workspace dependencies.');}
       }
     }

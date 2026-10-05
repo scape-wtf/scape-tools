@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +29,7 @@ test('agent init creates an installable private kit, configuration and secret-fr
   assert.equal(await readFile(path.join(project,'scape.agent.json'),'utf8'),original);
 });
 
-for(const variant of ['provider','custom','moss','limited'])test(`CLI runner pairs through MCP, replies with ${variant} and leaves on SIGINT`, {timeout:20000},async t=>{
+for(const variant of ['provider','custom','moss','limited'])test(`CLI runner pairs through MCP, replies with ${variant} and leaves on SIGINT`, {timeout:20000,skip:variant==='moss' && !existsSync(fileURLToPath(new URL('../moss-agent/src/cli.ts',import.meta.url)))},async t=>{
   const custom=variant==='custom',limited=variant==='limited';
   const temp=await mkdtemp(path.join(tmpdir(),'scape-agent-run-'));t.after(()=>rm(temp,{recursive:true,force:true}));
   let requests=0,speaks=0,leaves=0,observes=0,modelBody='';const failures=[];
