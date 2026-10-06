@@ -3,12 +3,23 @@
 Gizmos are things you place in Scape that do something. The current API defines them with
 `defineObject` and collects them with `defineProject({ objects: [...] })`.
 
-Run `npm install`, then `npm run build` to check your definition. Connect with
-`npm run dev` to connect to your Scape developer world at https://scape.wtf. Use `--origin` only for another host.
-That script runs `scape gizmo dev`; the public CLI is already included in the generated project.
-Open the printed link, sign in, and approve the matching connection code in your
-hosted Scape developer world. Select **My gizmo** in the developer sidebar or the
-placement palette, place it, and open it. Saving source changes updates the preview.
+Use Node.js 22 or newer. In this project directory:
+
+```sh
+npm install
+npm run build
+npm exec -- scape gizmo dev
+```
+
+This uses the project's installed CLI and connects to https://scape.wtf. Use
+`--origin <https-url>` only for another compatible host. After installing the CLI
+with `npm install --global @scape-wtf/cli`, you can also use the sidebar's
+`scape gizmo dev --origin <https-url>` command here. `npm run dev` is a shortcut
+for the same `scape gizmo dev` script; it requires this project's dependencies.
+
+Open the printed link, sign in, and choose **Connect project** in the developer
+sidebar after comparing the code with your terminal. Select **My gizmo** in the
+sidebar or placement palette, place it, and open it. Saving source updates the preview.
 
 `src/project.ts` is the project entry and collects your gizmos. Start in `src/definition.ts`. The starter has empty state and no actions: choose
 your own namespaced `type`, emoji, label and behavior. Keep the default export.
@@ -40,23 +51,28 @@ normal world tools remain available in the game. Disconnecting stops updates but
 keeps your world and last uploaded build. Developer worlds are private, limited to
 one per account, marked after 90 days without a visit and removed after 120 days.
 
-## Agent and source-kit commands
+## Agent commands
 
-The generated project uses the published npm packages. Repository exports may include local archives for source contributors; keep those archives and the manifest.s Yarn resolutions together when working from a source kit.
+With this project's dependencies installed, use `npm exec -- scape agent run`
+for guided agent setup and pairing. A globally installed CLI can run
+`scape agent run` from any directory without an agent project.
 
-With dependencies installed, `scape gizmo init /path/to/another-project` creates
-another blank project and carries all three archives forward. The destination must be
-new and its parent must exist. `scape init` and `scape dev` remain compatibility aliases.
+For an existing MCP host, run `npm exec -- scape agent mcp config` and copy the
+generated absolute Node command and arguments into that host. Use Node directly
+for stdio MCP; package-manager output can interfere with the protocol.
+Your MCP host supplies the model and decision loop. `scape agent mcp serve`
+starts only the MCP server. Agent approval in the sidebar's **Agents** tab or
+**Settings → Developer → Agents** is separate from Gizmo upload approval.
 
-This kit also supports agent setup without a Scape source checkout:
+Create another blank project with `npm exec -- scape gizmo init /path/to/new-project`.
+The destination must be new and its parent must exist. `scape init` and `scape dev`
+remain compatibility aliases. See the [CLI guide](https://developer.scape.wtf/reference/cli).
 
-```sh
-scape agent mcp config
-```
+## Contributor/source-workspace kits
 
-Copy the generated absolute Node command and arguments into your MCP host. Do not
-replace the command with Yarn, whose output can interfere with stdio MCP. Your host
-supplies the agent model and decision loop. Agent approval in Settings → Developer → Agents is
-separate from this project's Gizmo upload grant. The canonical direct server command
-is `scape agent mcp serve`; it starts the MCP server,
-not a model. Run `scape --help` for the command summary.
+Public starters use published npm dependencies. Source exports may instead include
+SDK, CLI and MCP archives in `vendor/`. Keep those archives and the manifest's
+Yarn resolutions together. Inside such a kit, use `yarn install`, `yarn build`
+and `yarn scape gizmo dev`. `yarn scape gizmo init /path/to/new-project` carries
+all three archives forward. Use `yarn scape agent run` or
+`yarn scape agent mcp config` for the kit's local agent commands.

@@ -92,5 +92,6 @@ export interface AgentSessionOptions {
   /** Stop instead of silently dropping excess pending activity; defaults to 128. */
   maxPendingEvents?: number;
 }
-/** Own one entered session until stop, cancellation or failure. Always leave on exit. */
+/** Own one entered session. Retry built-in provider failures while observing;
+ * connection failures surface to the owner runner. Always attempt leave on exit. */
 export function runAgentSession(options: AgentSessionOptions): Promise<void>;

@@ -1,3 +1,5 @@
+import { connectionDetails } from './recovery.mjs';
+
 /** A local lifecycle adapter. Models see public observations, never the client's bearer. */
 export class AgentBridge {
   #client;
@@ -15,6 +17,7 @@ export class AgentBridge {
   #epoch = 0;
   #waiters = new Set();
   #reason = 'Call scape_pair, approve its code in Scape, then call scape_enter.';
+  #failure;
   constructor(client, { idleMs = 120_000 } = {}) {
     this.#client = client;
     this.#idleMs = idleMs;
@@ -40,12 +43,14 @@ export class AgentBridge {
     return result;
   }
   #assertActive() {
-    if (this.#closed || !this.#active || !this.#latest) throw new Error(this.#reason);
+    if (this.#closed || !this.#active || !this.#latest)
+      throw this.#failure ?? new Error(this.#reason);
     this.#lastTool = Date.now();
     return this.#latest;
   }
   #detach(reason) {
-    this.#reason = reason;
+    this.#failure = reason instanceof Error ? reason : undefined;
+    this.#reason = this.#failure?.message ?? reason;
     this.#active = false;
     this.#latest = undefined;
     this.#unwatch?.();
@@ -98,6 +103,7 @@ export class AgentBridge {
           throw new Error('Entry was cancelled.');
         }
         this.#latest = observation;
+        this.#failure = undefined;
         this.#active = true;
         this.#lastTool = Date.now();
         const session = observation.sessionId;
@@ -111,10 +117,19 @@ export class AgentBridge {
             this.#latest = next;
             for (const wake of [...this.#waiters]) wake();
           },
-          () => {
+          error => {
             if (this.#active && this.#latest?.sessionId === session)
               void this.leave(
-                'The game connection ended. Call scape_enter, or pair again if access was revoked.',
+                Object.assign(
+                  new Error(
+                    'The game connection ended. Call scape_enter, or pair again if access was revoked.',
+                  ),
+                  {
+                    code: error.code,
+                    status: error.status,
+                    ...connectionDetails(error),
+                  },
+                ),
               ).catch(() => {});
           },
           250,
@@ -146,7 +161,7 @@ export class AgentBridge {
         else resolve(this.#latest);
       };
       const wake = () => {
-        if (!this.#active) finish(new Error(this.#reason));
+        if (!this.#active) finish(this.#failure ?? new Error(this.#reason));
         else if (this.#latest.revision !== afterRevision) finish();
       };
       const abort = () => finish(new Error('Observation wait cancelled.'));

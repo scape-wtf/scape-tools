@@ -1,4 +1,6 @@
-/** Dependency-free HTTP client. Model choice and wallet credentials stay with the owner. */
+import { connectionDetails, networkFailureReason } from './recovery.mjs';
+
+/** HTTP client. Model choice and wallet credentials stay with the owner. */
 export class ScapeAgent {
   #origin;
   #token;
@@ -26,22 +28,44 @@ export class ScapeAgent {
     this.#onToken = onToken;
   }
   async #call(action, body = {}, authenticated = true) {
-    const response = await this.#request(`${this.#origin}/api/agents/${action}`, {
-      method: 'POST',
-      redirect: 'error',
-      credentials: 'omit',
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authenticated && this.#token ? { Authorization: `Bearer ${this.#token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-    const result = await response.json();
+    let response;
+    try {
+      response = await this.#request(`${this.#origin}/api/agents/${action}`, {
+        method: 'POST',
+        redirect: 'error',
+        credentials: 'omit',
+        signal: AbortSignal.timeout(10_000),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authenticated && this.#token ? { Authorization: `Bearer ${this.#token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      throw Object.assign(new Error('Cannot reach Scape. The connection will be retried.'), {
+        code: 'connection_lost',
+        ...connectionDetails({ operation: action, reason: networkFailureReason(error) }),
+      });
+    }
+    let result;
+    try {
+      result = await response.json();
+    } catch (error) {
+      throw Object.assign(new Error('Scape returned an unreadable response.'), {
+        status: response.status,
+        ...connectionDetails({
+          operation: action,
+          reason:
+            error?.name === 'SyntaxError' ? 'unreadable_response' : networkFailureReason(error),
+        }),
+        ...(response.ok ? { code: 'connection_lost' } : {}),
+      });
+    }
     if (!response.ok) {
       const error = new Error(result.error || 'Agent request failed');
       error.code = result.code;
       error.status = response.status;
+      Object.assign(error, connectionDetails({ operation: action }));
       throw error;
     }
     return result;

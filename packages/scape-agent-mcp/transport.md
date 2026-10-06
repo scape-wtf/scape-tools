@@ -25,7 +25,7 @@ The repository `yarn agent` command runs this package's `diagnostics.mjs`. The
 `scape-agent` binary remains a diagnostic compatibility command supplied by
 `@scape-wtf/agent-mcp`; it is not a separate package or an AI integration API.
 
-1. Sign in to Scape. Create an owned world or open your developer world.
+1. Sign in to Scape. Choose any public world or a world you own, including your developer world.
 2. In Settings → Developer → Agents, enter the code printed by the runner, choose the world,
    review the agent name, then select **Connect agent**.
 3. The CLI enters automatically. Use `observe`, `say Hello`, `move 30 28`, `stop`,
@@ -36,17 +36,16 @@ The repository `yarn agent` command runs this package's `diagnostics.mjs`. The
    delivery time (a signed room ticket expires within 10 seconds as a fallback).
 
 Pair only a runner you started. The runner processes nearby public text on your
-computer/server. Codes expire after five minutes; grants last at most 24 hours
-and are tied to the account session that approved them. Signing out that session,
-account recovery holds, applicable bans, lost world ownership, world deletion or
-expiry end access. Re-pairing replaces the previous connection. The CLI keeps the
+computer/server. Codes expire after five minutes; new grants have no time expiry (`expiresAt: 0`)
+and remain tied to the account session that approved them. Signing out that session,
+account recovery holds, applicable bans, lost world access, world deletion or
+legacy grant expiry end access. Existing finite grants need one new pairing to remove their deadline. Re-pairing replaces the previous connection. The CLI keeps the
 secret in memory and prints only the pairing code; restart it to pair again.
 
 Agents use a separate identity and may bring an emoji, image or static GLB through
 MCP avatar tools, with a robot fallback and a server-assigned
 `· AI` name suffix. They count against ordinary room capacity and cannot edit,
-moderate, access wallets or use the owner's account session. Approval currently
-permits only a world owned by that account, including its hosted Scape developer world.
+moderate, access wallets or use the owner's account session. Approval permits any public world (including Commons) or a world owned by that account, including its hosted Scape developer world. A public world becoming private ends access unless the agent owner owns it; other accounts' developer worlds remain private.
 Agent visits do not renew developer-world retention. One agent per owner and at
 most 20 active gateway controllers are supported in this alpha.
 
@@ -160,8 +159,7 @@ Owner routes use the existing account cookie and trusted-origin rules:
 `GET manage`, `GET pending?code=…`, `POST approve {code,room}`, and `POST revoke`.
 The approval screen previews the name before approval; it never receives the
 runner's secret. The canonical machine-readable observation is
-[`AgentObservation`](../shared/src/types/Agent.ts), published in generated
-[`contracts.d.mts`](contracts.d.mts) through `@scape-wtf/agent-mcp/contracts`.
+[`AgentObservation` in `contracts.d.mts`](contracts.d.mts), generated from the shared wire types and published through `@scape-wtf/agent-mcp/contracts`.
 Internal client signatures live in [`transport.d.mts`](transport.d.mts).
 
 Errors return `{error,code}` with HTTP 4xx/5xx. Re-pair on `unauthorized` or
@@ -197,7 +195,7 @@ control/format characters.
   Preserve it separately if retaining stable moderation identities matters;
   losing it invalidates grants and requires re-pairing. Before public rollout,
   integrate backup, account-deletion retention, operational metrics and capacity
-  testing. This is an owned-world development alpha, not a paid public launch.
+  testing. This is a development alpha supporting public and owned worlds, not a paid public launch.
 
 ## Verification
 
@@ -205,7 +203,7 @@ control/format characters.
 room Worker test with temporary databases. It covers public presence and speech,
 concurrent entry, confirmed movement, stop, leave/re-entry, stale commands, blocks,
 idle expiry, room removal, grant revocation, developer-world boundaries and
-owner-session expiry. It opens local test sockets; it does not start the game or
+owner-session expiry. Public-world regressions cover Commons, other owners' worlds, live visibility changes, ownership transfers and owner bans. It opens local test sockets; it does not start the game or
 modify live room data. The suite also verifies the separate MCP adapter using
 official and legacy clients, tool validation, credential exclusion and cleanup.
 Build and workspace/server typechecks are also required.

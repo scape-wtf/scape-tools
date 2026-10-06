@@ -84,7 +84,8 @@ client, private storage, live-media/gem APIs, or version migration machinery. Th
 Scape uses its separate restricted runtime for uploaded gizmo definitions.
 The unified CLI uses `scape gizmo init` and `scape gizmo dev`; `scape init` and
 `scape dev` remain aliases. It also configures/serves MCP through `scape agent mcp`,
-without giving agents Gizmo upload grants or supplying an agent model.
+with agent approval separate from Gizmo upload grants. `scape agent run` provides
+the model/tool loop using your chosen provider; MCP config/serve alone do not run a model.
 
 ## Contributor/source-workspace kit
 
@@ -143,7 +144,6 @@ Passive gizmos can declare `ambience`, `glow` and/or `light` without an action o
 proximity, voice budgets, platform routing and cleanup belong to Scape. The presentation
 contract above provides a complete procedural example, limits and recovery behavior.
 
-
 Host catalogs use strict `ObjectRegistry` validation by default. Trusted built-in hosts
 can opt into `{ isolateInvalidDefinitions: true }` during startup, inspect `failures()`,
 and `disable(definition, reason)` after a model-preparation failure. `fork()` carries
@@ -162,7 +162,7 @@ player volume regardless of authored sound or lighting choices.
 for each accepted state; return `{}` to turn both off. Scape validates every result
 and caches it outside the frame loop. The optional bounded `light.pattern` adds
 palette-based scattered masks. See the [lighting contract](https://developer.scape.wtf/gizmos/presentation#state-driven-lighting)
-and [standalone lamp](../../gizmos/examples/lamp/README.md). Export the lamp using
+and [standalone lamp](https://developer.scape.wtf/examples/gizmos/lamp). Export the lamp using
 `yarn sdk:starter /absolute/new/directory --template lamp`.
 
 ### Step feedback
@@ -209,11 +209,11 @@ This is a reusable directional-input rule, not a special case for arrow emojis.
 Blocked pushes never replay cosmetic step effects. Walking and observed pushed
 arrivals produce `event.movement: 'walk' | 'push'`; joins and teleports stay quiet.
 
-The [Conveyor package](../../gizmos/built-in/conveyor/README.md) combines walkability, a fixed
-push and opposing-input blocking. The [Floor fan](../../gizmos/examples/fan/README.md)
+The [Conveyor package](https://developer.scape.wtf/gizmos/movement) combines walkability, a fixed
+push and opposing-input blocking. The [Floor fan](https://developer.scape.wtf/examples/gizmos/fan)
 chooses direction from each instance's saved state and can switch off independently.
 Both use exactly the same SDK and movement engine. The
-[walkable tile](../../gizmos/examples/walkable-tile/src/definition.ts) has neither push nor step.
+[walkable tile](https://developer.scape.wtf/examples/gizmos/walkable-tile) has neither push nor step.
 These examples are available by default in developer worlds; built-in conveyors
 are also available in ordinary worlds. Export the fan with `--template fan`.
 
@@ -224,7 +224,6 @@ movement behavior from the installed Conveyor definition. Composition is an
 owner-authorized scene edit and never flattens an arbitrary stateful push gizmo
 into an arrow. Saved drops retain the overlay and declared portable configuration
 (or initial state), with fresh identity. There is no conveyor-specific SDK API.
-
 
 ### Updating local prototypes
 
@@ -238,7 +237,7 @@ already updated; saved scenes are not rewritten.
 
 ### State-dependent sound, previews and layered sprites
 
-The complete [`@scape/gizmo-piano`](../../gizmos/built-in/piano/README.md) demonstrates these
+The complete [`@scape/gizmo-piano`](https://developer.scape.wtf/gizmos/effects) demonstrates these
 capabilities; the SDK has no note names, sound presets or instrument dispatch.
 
 - `configuration: { action, fields, remember?, open? }` declares portable settings.
@@ -287,10 +286,21 @@ react: () => ({
   feedback: {
     durationMs: 600,
     burst: { color: '#a9e8ff', radiusCells: 1.5, particles: 0 },
-    audio: [{ kind: 'play', voice: 'bell', sound: 'bell', delayMs: 0,
-      gain: 1, rate: 1, loop: false, rangeCells: [1, 8], stereo: .7 }],
+    audio: [
+      {
+        kind: 'play',
+        voice: 'bell',
+        sound: 'bell',
+        delayMs: 0,
+        gain: 1,
+        rate: 1,
+        loop: false,
+        rangeCells: [1, 8],
+        stereo: 0.7,
+      },
+    ],
   },
-})
+});
 ```
 
 Declare `bell` in `sounds` or `soundBank`. Feedback is bounded to 16 KiB and
@@ -325,8 +335,8 @@ cannot select arbitrary coordinates, other floors or item IDs. Use action
 `permission: 'remover'` when the action itself also requires source removal rights.
 Host contexts supply `canRemove`; it defaults to false.
 
-See [Chime](../../gizmos/examples/chime/README.md) for a shared signal and
-[Bomb](../../gizmos/built-in/bomb/README.md) for an independent composition of bump input,
+See [Chime](https://developer.scape.wtf/examples/gizmos/chime) for a shared signal and
+[Bomb](https://developer.scape.wtf/gizmos/reactions) for an independent composition of bump input,
 server timing, shared feedback and area removal.
 
 ## Linking and same-floor travel
@@ -363,8 +373,8 @@ build changes or gameplay becomes inactive.
 context never changes saved state. Use `resolveGizmoLighting` when evaluating a
 recipe in tests; it supplies an unlinked context by default.
 
-[Portal](../../gizmos/built-in/portal/README.md) combines these primitives.
-[Jump pad](../../gizmos/examples/jump-pad/README.md) uses offset travel without
+[Portal](https://developer.scape.wtf/gizmos/movement) combines these primitives.
+[Jump pad](https://developer.scape.wtf/examples/gizmos/jump-pad) uses offset travel without
 linking, special artwork, sound or glow. Both use the same movement host.
 
 Generic travel geometry requires the updated room worker. Equivalent reciprocal
@@ -401,7 +411,7 @@ in-flight departure. Rejected host navigation restores the player.
 `worldTextRange` independently limits `worldText` visibility to a distance in cells
 (greater than zero, at most 32). Omit it for normal always-visible world text.
 
-The [Door package](../../gizmos/built-in/door/README.md) composes these contracts:
+The [Door package](https://developer.scape.wtf/gizmos/movement) composes these contracts:
 its destination state, label, blue glow, departure recipe and sound live entirely
 in the package. Entry/spawn markers remain host infrastructure. This migration is
 implemented and owner-approved October 3, 2026; it is not yet a published

@@ -30,6 +30,7 @@ export interface AgentConfig {
     maxToolRounds: number;
     maxOutputTokens: number;
     historyTurns: number;
+    /** Per-process request ceiling; 0 means unlimited. Default 200. */
     maxModelCalls: number;
     minTurnIntervalMs: number;
   };

@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { terminal } from './terminal.mjs';
 import { configureProfile, managedAgent } from './managed-agent.mjs';
+import { configureDecision } from './decision-setup.mjs';
 import { readProfile, saveProfile, lockProfile, runningProfile } from './profile.mjs';
 import { parseAgentConfig, pairAgent } from '@scape-wtf/agent-mcp/runner';
 const cli = fileURLToPath(new URL('./cli.mjs', import.meta.url));
@@ -69,6 +70,10 @@ test('guided configuration saves a private profile without projects, installs or
   });
   const profile = await configureProfile({ directory, ui, env: {} });
   assert.equal(profile.providerKey, 'PROVIDER_SECRET');
+  assert.equal(profile.config.decision.type, 'openrouter');
+  assert.equal(profile.config.decision.model, 'typesafe/jev-1.13');
+  assert.equal(profile.config.decision.baseUrl, 'https://openrouter.ai/api/alpha/decisions');
+  assert.equal(profile.decisionKey, 'PROVIDER_SECRET');
   assert.equal(profile.config.name, 'Scout');
   assert.equal(profile.origin, 'https://scape.wtf');
   assert.deepEqual(await readdir(directory), ['agent.json']);
@@ -86,6 +91,112 @@ test('guided configuration saves a private profile without projects, installs or
   };
   await assert.rejects(configureProfile({ previous: profile, directory, ui: cancelled }), /cancel/);
   assert.deepEqual(await readProfile(directory), profile);
+});
+
+test('OpenRouter setup reuses environment credentials without saving their values and allows opting out', async t => {
+  const directory = await temp(t);
+  const env = { OPENROUTER_API_KEY: 'ENV_SECRET' };
+  const ui = fakeUI({ 'Model provider': 'openrouter', 'Tool-capable model ID': 'conversation' });
+  const profile = await configureProfile({ directory, ui, env });
+  assert.equal(profile.config.decision.model, 'typesafe/jev-1.13');
+  assert.equal(profile.config.decision.apiKeyEnv, 'OPENROUTER_API_KEY');
+  assert.equal(profile.providerKey, undefined);
+  assert.equal(profile.decisionKey, undefined);
+  assert.doesNotMatch(await readFile(path.join(directory, 'agent.json'), 'utf8'), /ENV_SECRET/);
+  assert.doesNotMatch(ui.lines.join('\n'), /ENV_SECRET/);
+  const disabled = await configureProfile({
+    directory,
+    previous: profile,
+    env,
+    ui: fakeUI({ 'Decision model': 'none' }),
+  });
+  assert.equal(disabled.config.decision, undefined);
+  assert.equal(disabled.decisionKey, undefined);
+});
+
+test('OpenRouter decision setup preserves separate keys and custom models, and reuses the current conversation key when selected', async t => {
+  const directory = await temp(t);
+  const profile = await configureProfile({
+    directory,
+    env: {},
+    ui: fakeUI({
+      'Model provider': 'openrouter',
+      'Tool-capable model ID': 'conversation',
+      'API key (hidden)': 'CHAT_SECRET',
+      'Decision model ID': 'typesafe/custom',
+      'Decision credentials': 'enter',
+      'Decision API key (hidden)': 'SEPARATE_SECRET',
+    }),
+  });
+  assert.equal(profile.config.decision.model, 'typesafe/custom');
+  assert.equal(profile.decisionKey, 'SEPARATE_SECRET');
+  const retained = await configureProfile({ directory, previous: profile, env: {}, ui: fakeUI() });
+  assert.equal(retained.decisionKey, 'SEPARATE_SECRET');
+  const reused = await configureProfile({
+    directory,
+    previous: retained,
+    env: {},
+    ui: fakeUI({
+      'Decision credentials': 'conversation',
+      'API key (hidden; Enter keeps saved key)': 'ROTATED_SECRET',
+    }),
+  });
+  assert.equal(reused.decisionKey, 'ROTATED_SECRET');
+  const rotated = await configureProfile({
+    directory,
+    previous: reused,
+    env: {},
+    ui: fakeUI({
+      'API key (hidden; Enter keeps saved key)': 'LATEST_SECRET',
+    }),
+  });
+  assert.equal(rotated.decisionKey, 'LATEST_SECRET');
+  assert.equal(rotated.config.decision.model, 'typesafe/custom');
+});
+
+test('conversation key reuse is offered only between official OpenRouter endpoints', async () => {
+  const variants = [
+    { provider: { type: 'xai', baseUrl: 'https://api.x.ai/v1' }, type: 'openrouter' },
+    { provider: { type: 'openrouter', baseUrl: 'https://other.example/v1' }, type: 'openrouter' },
+    { provider: { type: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1' }, type: 'typesafe' },
+    {
+      provider: { type: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1' },
+      type: 'system-one',
+    },
+  ];
+  for (const { provider, type } of variants) {
+    const ui = fakeUI({
+      'Decision model': type,
+      'Decision credentials': 'enter',
+      'Decision API key (hidden)': 'DECISION_SECRET',
+      'Decision model ID': 'fixture',
+      'Decision API URL (full endpoint)': 'https://other.example/decision',
+    });
+    const choose = ui.choose;
+    ui.choose = (label, choices, current) => {
+      if (label === 'Decision credentials')
+        assert.ok(!choices.some(c => c.value === 'conversation'));
+      return choose(label, choices, current);
+    };
+    const result = await configureDecision({ provider, providerKey: 'CHAT_SECRET', ui, env: {} });
+    assert.equal(result.decisionKey, 'DECISION_SECRET');
+  }
+});
+
+test('FR-153: guided setup accepts and preserves zero as unlimited', async t => {
+  const directory = await temp(t);
+  const ui = fakeUI({
+    'Model provider': 'openrouter',
+    'Tool-capable model ID': 'fixture-model',
+    'API key (hidden)': 'FIXTURE_KEY',
+    'Maximum model requests per run': '0',
+  });
+  const profile = await configureProfile({ directory, ui, env: {} });
+  assert.equal(profile.config.limits.maxModelCalls, 0);
+  assert.match(ui.lines.join('\n'), /Unlimited conversation/);
+  const again = await configureProfile({ previous: profile, directory, ui: fakeUI(), env: {} });
+  assert.equal(again.config.limits.maxModelCalls, 0);
+  assert.equal((await readProfile(directory)).config.limits.maxModelCalls, 0);
 });
 
 test('changing endpoint discards provider key and changing Scape host discards grant', async t => {

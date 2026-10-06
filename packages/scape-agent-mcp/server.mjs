@@ -5,6 +5,7 @@ import { ScapeAgent } from './transport.mjs';
 import { AGENT_NAME_MAX_LENGTH, GRID, MAX_STATUS_TEXT_LENGTH } from './contracts.mjs';
 import { AgentBridge } from './bridge.mjs';
 import { avatarFiles } from './assets.mjs';
+import { connectionDetails } from './recovery.mjs';
 
 export const instructions = `Connect an owner-run agent to Scape. No model provider or model key is required by this server.
 First call scape_pair and show the owner the code. Wait for their approval in Scape Settings → Developer → Agents, then call scape_enter.
@@ -64,7 +65,14 @@ export function createScapeMcpServer({ origin, token, client, idleMs, assetDirec
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({ error: message, ...(known ? { code: error.code } : {}) }),
+                text: JSON.stringify({
+                  error: message,
+                  ...connectionDetails(error),
+                  ...(known ? { code: error.code } : {}),
+                  ...(Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599
+                    ? { status: error.status }
+                    : {}),
+                }),
               },
             ],
           };

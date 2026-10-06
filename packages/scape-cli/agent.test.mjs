@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -16,6 +16,40 @@ const until = async check => {
   }
   throw new Error('Agent test timed out');
 };
+
+test('registry installation creates an agent project with current public dependencies', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'scape-agent-registry-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  for (const name of ['cli.mjs', 'agent.mjs', 'terminal.mjs']) {
+    await cp(new URL(`./${name}`, import.meta.url), path.join(directory, name));
+  }
+  // Supply installed dependencies without the source-workspace or kit markers.
+  const dependencyDirectory = fileURLToPath(new URL('../../node_modules', import.meta.url));
+  await symlink(dependencyDirectory, path.join(directory, 'node_modules'), 'dir');
+  const project = path.join(directory, 'Scout');
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(directory, 'cli.mjs'),
+      'agent',
+      'init',
+      project,
+      '--provider',
+      'openrouter',
+      '--model',
+      'fixture',
+    ],
+    { cwd: directory, encoding: 'utf8', timeout: 10000 },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const manifest = JSON.parse(await readFile(path.join(project, 'package.json'), 'utf8'));
+  assert.deepEqual(manifest.dependencies, {
+    '@scape-wtf/cli': '0.1.4',
+    '@scape-wtf/agent-mcp': '0.1.3',
+  });
+  assert.equal(manifest.resolutions, undefined);
+  assert.equal(existsSync(path.join(project, 'vendor')), false);
+});
 
 test('agent init creates an installable private kit, configuration and secret-free environment template', async t => {
   const temp = await mkdtemp(path.join(tmpdir(), 'scape-agent-init-'));

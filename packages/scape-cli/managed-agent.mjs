@@ -141,12 +141,13 @@ async function collectProfile({
     signal,
     fetchImpl,
   });
+  ui.line('Use 0 for unlimited conversation requests. Provider charges still apply.', 'muted');
   const maxModelCalls = Number(
     await ui.ask('Maximum model requests per run', {
-      value: String(previous?.config.limits?.maxModelCalls || 200),
+      value: String(previous?.config.limits?.maxModelCalls ?? 200),
       validate: v => {
-        if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 100000)
-          throw new Error('Choose a whole number from 1 to 100000.');
+        if (!/^\d+$/.test(v) || Number(v) > 100000)
+          throw new Error('Choose 0 for unlimited requests, or a whole number from 1 to 100000.');
       },
     }),
   );
@@ -157,7 +158,7 @@ async function collectProfile({
     'muted',
   );
   const { decision, decisionKey } = behavior.enabled
-    ? await configureDecision({ previous, ui, env, signal })
+    ? await configureDecision({ previous, provider, providerKey, ui, env, signal })
     : {};
   ui.step('03 / 03', 'Your Scape connection');
   const gameOrigin = validateEndpoint(
@@ -204,7 +205,7 @@ async function collectProfile({
   );
   ui.line(`Scape  ${gameOrigin}`);
   ui.line(
-    `Request limits  ${maxModelCalls} conversation${decision ? ` · ${decision.maxRequests} decision` : ''}`,
+    `Request limits  ${maxModelCalls === 0 ? 'Unlimited' : maxModelCalls} conversation${decision ? ` · ${decision.maxRequests} decision` : ''}`,
     'muted',
   );
   ui.line(

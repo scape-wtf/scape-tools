@@ -30,32 +30,39 @@ Run `scape --help` after installation, or use `npx @scape-wtf/cli@latest --help`
 `scape init` and `scape dev` remain compatibility aliases; use namespaced commands
 for new documentation and scripts.
 
-## Contributor/source-workspace notes
+## Choose the command for your installation
 
-## Obtain and install a kit
+Use Node.js 22 or newer. All commands connect to `https://scape.wtf` by default;
+pass `--origin <https-url>` only for another compatible Scape host.
 
-An operator with source access exports a kit with
-`yarn sdk:starter /path/to/new-project`. Exported source kits contain three local archives:
-`scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz` under
-`vendor/`. The manifest uses local SDK/CLI dependencies and a Yarn resolution for the transitive MCP dependency. Keep the archives and resolutions together, then run
-`yarn install` in the exported project. Public third-party dependencies still need
-installation; this is not a fully offline kit. No game source or credentials are copied.
+| Installation                                                  | Run a Gizmo project           | Run an agent                  |
+| ------------------------------------------------------------- | ----------------------------- | ----------------------------- |
+| Global CLI: `npm install --global @scape-wtf/cli`             | `scape gizmo dev`             | `scape agent run`             |
+| Project-local CLI: run `npm install` in the generated project | `npm exec -- scape gizmo dev` | `npm exec -- scape agent run` |
+| Contributor kit/source workspace: run `yarn install`          | `yarn scape gizmo dev`        | `yarn scape agent run`        |
 
-An installed kit supports both command families without a source checkout.
-`yarn scape gizmo init /path/to/another-project` carries all three archives into a new
-blank project. Initial kit export still requires repository access; public projects should use the registry packages described above.
+Run Gizmo development from the directory containing its `package.json` and source.
+Agents can run from any directory after a global CLI installation; no per-agent
+project or dependency installation is required. For one-off use, replace `scape`
+with `npx @scape-wtf/cli@latest`.
+
+Generated Gizmo projects also offer `npm run dev` (or `yarn dev`) as a shortcut for
+`scape gizmo dev`. This shortcut depends on the project's `dev` script. In the
+Scape source workspace, root `yarn dev` starts the game server.
 
 ## Persistent agents
 
 ```sh
-yarn scape agent run
+scape agent run
 ```
 
 From an installed CLI, use `scape agent run` from any directory. First use walks
 through name, personality, avatar, conversation provider/model/key, an optional
-decision model with separate credentials and request limits, Scape URL and pairing.
+decision model with its own request limit, Scape URL and pairing. OpenRouter setup
+prefills JEV and offers to reuse your conversation OpenRouter key.
 No agent project or dependency installation is required after the CLI is installed.
-The owner approves the printed code in Settings → Developer → Agents. The runner
+The owner approves the printed code in Settings → Developer → Agents and chooses
+any public world (including Commons) or a world they own. The runner
 saves access and keeps observing between responses. Ctrl+C leaves.
 
 - `scape agent configure` changes settings through prompts.
@@ -77,9 +84,11 @@ MCP config/serve retain clean protocol output.
 
 Optional custom-code projects remain available with
 `scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]`.
-They contain CLI/MCP archives, configuration, and an environment template. Install
-with Yarn and run `scape agent run --project <directory> --origin <https-url>`.
-The generated `yarn agent` script selects project mode. This mode uses project
+They contain configuration, an environment template and published CLI/MCP dependencies.
+Run `npm install` in the new directory, then `npm exec -- scape agent run --project .`.
+The generated `npm run agent` script selects the same project mode. Contributor
+exports carry CLI/MCP archives and Yarn resolutions; those kits use `yarn install`
+and `yarn scape agent run --project .`. This mode uses project
 `.env`/`SCAPE_AGENT_TOKEN` and does not persist grants in the managed profile.
 
 Provider choices include OpenAI and xAI/Grok Responses, Anthropic Messages,
@@ -89,21 +98,36 @@ providers use their official endpoints; custom hosts use openai-compatible.
 ChatGPT subscription access is deferred until official production availability
 for Scape; it is not a CLI option. The model must support tool calling. Shared social behavior is enabled by default;
 setup offers social exploration, social without exploration, or model-only mode.
-Moss uses this same runner. Persistent memory and tour/demo/lesson routines are deferred or excluded;
+Moss uses this same runner. Local encounter metadata has 30-day retention;
+use `scape agent memory` to inspect or manage it. Tour/demo/lesson routines are excluded;
 see the configuration reference for behavior settings.
-Decision model choices include TypeSafe JEV, Cloudflare Clef/Clef-flash, System One
+Decision model choices include OpenRouter JEV, TypeSafe JEV, Cloudflare Clef/Clef-flash, System One
 and structured-output compatible endpoints, or a trusted local adapter file.
-No decision provider is enabled by default. Decision failure or request-budget
+For OpenRouter conversation setup, JEV (`typesafe/jev-1.13`) is preselected when no
+decision model is already configured. Keep the suggested model, edit it, choose
+**None**, or select another provider. **Use conversation OpenRouter key** reuses
+the key just configured; you can also enter a separate decision key. Environment
+credentials remain environment references and are not copied into the profile.
+Other conversation providers default to no decision model. Running an existing
+profile does not change its configuration. Decision failure or request-budget
 exhaustion disables that stage for the run while basic behavior continues;
-conversation-provider failures retain their stop behavior. See [decision setup](https://developer.scape.wtf/agents/decision-models).
+conversation-provider failures retry with exponential backoff while observations continue. See [decision setup](https://developer.scape.wtf/agents/decision-models).
 Normal provider charges apply. The default 200-request limit resets per process
-and is not a currency cap. History stays in memory. Trusted custom policies can
+and is not a currency cap. Set `limits.maxModelCalls` to `0`, or enter `0` in guided setup, for unlimited conversation requests. Failed attempts and private reply checks count toward a finite budget. History stays in memory.
+
+New approved grants have no time expiry. Pairing codes still expire after five minutes; existing finite grants require one new pairing to remove their deadline. Revocation, the approving account session ending, bans, and lost world access still stop the process. Observation outages and ended presence sessions reconnect with a fresh observation and policy, using exponential delays from one to thirty seconds. No dispatched world action is automatically replayed. Ctrl+C cancels recovery. Scape still does not install a background service. Trusted custom policies can
 replace the built-in model policy. See the [quickstart](https://developer.scape.wtf/agents/quickstart)
 and [configuration reference](https://developer.scape.wtf/agents/configuration).
 
+Connection retry messages include a UTC timestamp, error code, failed operation,
+HTTP status when available and a safe explanation (for example, a request timeout,
+connection reset or backend world reconnection). Raw errors, response bodies and
+credentials are excluded. Keep the timestamp and codes when reporting a failure;
+see [connection troubleshooting](https://developer.scape.wtf/agents/troubleshooting#the-world-connection-is-interrupted).
+
 ## Interactive MCP testing
 
-From an installed kit or source workspace:
+With the CLI installed globally (project-local and contributor alternatives are listed above):
 
 ```sh
 scape agent mcp config
@@ -127,17 +151,22 @@ interface; the CLI does not add another gameplay protocol.
 
 ## Gizmo development
 
+Create a blank project and run its installed CLI:
+
 ```sh
-npm run dev
+npx @scape-wtf/cli@latest gizmo init my-gizmo
+cd my-gizmo
+npm install
+npm run build
+npm exec -- scape gizmo dev
 ```
 
-In exported starters and examples, `yarn dev` runs `scape gizmo dev`. Other projects can run
-`scape gizmo dev`. The command connects to https://scape.wtf by default. Use `--origin` for another Scape host.
+The command connects to https://scape.wtf by default. Use `--origin` for another Scape host.
 HTTP is accepted only for localhost. No local web server, inbound connection, VPN,
 browser-to-laptop request or tunnel is needed. Origin redirects are refused.
 
 Open the printed URL, sign in, compare the displayed pairing code with your terminal,
-and choose **Connect this project** in the developer sidebar. The code expires after
+and choose **Connect project** in the developer sidebar. The code expires after
 five minutes. Approval grants a two-hour, world-scoped session. Reconnecting replaces
 that world's previous session. Tokens stay in CLI memory and are never printed or
 written to disk. Disconnect in the sidebar or stop the command to revoke the token;
@@ -182,3 +211,16 @@ local revision, or says no local build is active. Correct the setting and save t
 Rejected uploads do not replace the accepted build. Direct edits to Scape's built-in
 workspace packages bypass this upload recovery boundary; see the
 [effect recovery contract](https://developer.scape.wtf/gizmos/presentation#effect-diagnostics-and-recovery).
+
+## Contributor/source-workspace kits
+
+An operator with source access exports a kit with
+`yarn sdk:starter /path/to/new-project`. Exported source kits contain three local archives:
+`scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz` under
+`vendor/`. The manifest uses local SDK/CLI dependencies and a Yarn resolution for the transitive MCP dependency. Keep the archives and resolutions together, then run
+`yarn install` in the exported project. Public third-party dependencies still need
+installation; this is not a fully offline kit. No game source or credentials are copied.
+
+An installed kit supports both command families without a source checkout.
+`yarn scape gizmo init /path/to/another-project` carries all three archives into a new
+blank project. Initial kit export still requires repository access; public projects should use the registry packages described above.

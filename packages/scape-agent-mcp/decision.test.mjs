@@ -37,6 +37,7 @@ const compatible = {
 test('decision config preserves optional setup and pins named providers and dedicated secrets', () => {
   assert.equal(parseAgentConfig(raw(undefined)).decision, undefined);
   assert.equal(parseAgentConfig(raw({ type: 'typesafe' })).decision.model, 'jev-latest');
+  assert.equal(parseAgentConfig(raw({ type: 'openrouter' })).decision.model, 'typesafe/jev-1.13');
   assert.equal(
     parseAgentConfig(raw({ type: 'cloudflare', accountId: 'a'.repeat(32) })).decision.model,
     'clef-flash',
@@ -44,6 +45,7 @@ test('decision config preserves optional setup and pins named providers and dedi
   for (const decision of [
     { type: 'cloudflare' },
     { type: 'typesafe', baseUrl: 'https://wrong.example' },
+    { type: 'openrouter', baseUrl: 'https://wrong.example' },
     { ...compatible, baseUrl: 'http://remote.example/decide' },
     { ...compatible, baseUrl: 'https://user:secret@example.test/decide' },
     { ...compatible, apiKeyEnv: 'SCAPE_AGENT_TOKEN' },
@@ -61,13 +63,13 @@ test('decision config preserves optional setup and pins named providers and dedi
   );
 });
 
-for (const type of ['typesafe', 'cloudflare', 'system-one', 'openai-compatible'])
+for (const type of ['openrouter', 'typesafe', 'cloudflare', 'system-one', 'openai-compatible'])
   test(`${type} decision request uses its protocol, isolated key and validated answers`, async () => {
     let calls = 0;
     const config =
       type === 'cloudflare'
         ? { type, accountId: 'a'.repeat(32), model: 'clef' }
-        : type === 'typesafe'
+        : ['openrouter', 'typesafe'].includes(type)
           ? { type }
           : { ...compatible, type };
     const client = await createDecisionClient({
@@ -89,6 +91,11 @@ for (const type of ['typesafe', 'cloudflare', 'system-one', 'openai-compatible']
           return Response.json({ success: true, result: { answers } });
         }
         if (type === 'typesafe') assert.equal(url, 'https://api.typesafe.ai/v1/systemone');
+        if (type === 'openrouter') {
+          assert.equal(url, 'https://openrouter.ai/api/alpha/decisions');
+          assert.equal(body.model, 'typesafe/jev-1.13');
+          assert.equal(body.messages, undefined);
+        }
         if (type === 'openai-compatible') {
           assert.equal(url, compatible.baseUrl + '/chat/completions');
           assert.equal(body.response_format.type, 'json_schema');

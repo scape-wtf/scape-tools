@@ -1,8 +1,9 @@
 # Floor fan
 
-Inside this repository, you can run `npm run dev` directly
-from this example directory after the root dependencies are installed. `npm run build`
-and `npm test` also use the repository tools. The public packages are available from npm. For an independent project, use `npx @scape-wtf/cli@latest gizmo init my-gizmo`; source contributors can still use the repository exporter.
+See [Run an example](https://developer.scape.wtf/examples/gizmos/fan#run-this-example) for public setup and making an
+independent copy. Inside this example directory, run `npm run build`, `npm test`
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
+use `--origin <https-url>` only for another compatible host.
 
 A standalone example of **walkability plus state-driven pushing**, using only
 `@scape-wtf/sdk`. It is available by default in the developer-world sidebar and palette.
@@ -29,14 +30,10 @@ leaves it false. Neither can bypass walls or target another player.
 Change the direction logic or add a cosmetic `step` callback to experiment. The
 walkable-only 🟦 example demonstrates that neither callback is required for a floor.
 
-Export an independent copy:
-
-```sh
-npm exec -- scape gizmo init /absolute/new/fan-project --template fan
-```
+To edit an independent copy, follow [the public example setup](https://developer.scape.wtf/examples/gizmos/fan#run-this-example).
 
 Inside that copy, run `npm install`, `npm test`, then
-`npm run dev` to pair it with your developer world.
+`npm exec -- scape gizmo dev` to pair it with your developer world.
 The packed-consumer regression builds and tests this exact source outside the
 monorepo. Gameplay tests cover local and remote pushes, switching, direction changes,
 blocked paths and once-per-arrival pad effects. Browser/device review belongs to the owner.

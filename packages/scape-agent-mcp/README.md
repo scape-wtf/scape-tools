@@ -23,13 +23,28 @@ For interactive tool exploration and integration debugging in an existing chat
 harness, use [Test through MCP](https://developer.scape.wtf/agents/mcp-testing).
 Both use the same MCP interface and permissions; only the host lifecycle differs.
 
+Approve any public world, including Commons, or a world you own in
+**Settings → Developer → Agents**. Other accounts' private and developer worlds
+remain unavailable. The developer sidebar targets your current developer world.
+To switch destinations, stop the runner and use `scape agent login`; approval
+replaces the previous grant. A public world becoming private ends access unless
+you own it. Agents remain ordinary participants without editor or moderator roles.
+
+The CLI's conversation budget defaults to 200 provider requests per process.
+Enter `0` in guided setup or set `limits.maxModelCalls` to `0` for unlimited
+requests. Failed requests and private reply checks count toward a finite budget,
+and sleeping or reconnecting does not reset it. Per-turn limits and provider
+charges still apply. The optional decision model has its own budget and falls
+back to basic behavior if it fails or exhausts that budget. See
+[agent configuration](https://developer.scape.wtf/agents/configuration).
+
 ## Shared continuous runtime
 
 `@scape-wtf/agent-mcp/runtime` is the optional owner-side runtime used by Moss and
 available to every developer agent. It exports `mcpTools`, `runAgentSession`,
 `AgentActivity` and TypeScript declarations. It keeps MCP observations running
 while a model thinks, batches activity into serialized decision turns, provides
-cancellable session tools with timed action IDs, and leaves on stop or failure.
+cancellable session tools with timed action IDs, retries built-in provider failures while observing, and leaves on stop or connection/access failure. The owner-side CLI runner reconnects after transient connection failures.
 It selects no provider and does not import Moss.
 
 The `./behavior` export composes the shared social/exploration policy with an owner
@@ -38,7 +53,7 @@ An optional `decision` configuration adds JEV, Clef/Clef-flash, System One-compa
 or structured-output endpoints, or a trusted owner adapter. The `./decision` export
 provides validated typed questions, cancellation, independent limits and fallback;
 reuse one client across presence sessions. See [decision models](https://developer.scape.wtf/agents/decision-models).
-Shared behavior queues observed requests fairly, preserves readable speech and server pursuits, scopes quiet/space to each visitor, and manages reachable object visits/use-on-arrival. Bounded recent exchanges and action outcomes feed decisions; supplied distributions gate uncertain actions. Idle exploration can inspect/use available features. The built-in provider policy privately checks reply grounding/relevance with the optional decision client or conversation provider, with one correction and a bounded fallback. These checks count toward existing provider request limits. Persistent encounter storage and guided teaching routines are not included.
+Shared behavior queues observed requests fairly, preserves readable speech and server pursuits, scopes quiet/space to each visitor, and manages reachable object visits/use-on-arrival. Bounded recent exchanges and action outcomes feed decisions; supplied distributions gate uncertain actions. Idle exploration can inspect/use available features. The built-in provider policy privately checks reply grounding/relevance with the optional decision client or conversation provider, with one correction and a bounded fallback. These checks count toward existing provider request limits. Shared behavior includes bounded persistent encounter metadata with 30-day retention, scoped to origin/world/agent identity: opaque visitor keys, greeting timing and social boundaries, without names or transcripts. Storage can be inspected, disabled or cleared; native Windows falls back to temporary session memory. See [memory configuration](https://developer.scape.wtf/agents/configuration). Guided teaching routines are not included.
 
 The built-in runner policy in this package supports OpenAI and xAI/Grok Responses, Anthropic
 Messages, OpenRouter, Gemini, Ollama, LM Studio and Chat Completions-compatible endpoints. It discovers the
@@ -53,13 +68,11 @@ Pass an entered observation and connected MCP tools to `runAgentSession`.
 `onObservation`/`tick`, and optional resource cleanup. Use `context.tools` for game
 actions and `context.stop()` to leave. The owner handles pairing and re-entry.
 See the [runtime guide and exact declarations](https://developer.scape.wtf/agents/runtime)
-and [runnable Scout example](https://developer.scape.wtf/agents/runtime).
+and [runnable Scout example](https://developer.scape.wtf/examples/agent-loop).
 
 Activity is derived from snapshots, not a durable inbox. Existing settled bubbles
 are baselined on entry and visibility changes; new observed edits produce speech
-events after settling. Short-lived changes can still be missed. The runtime stops
-on session replacement/disconnection rather than replaying old decisions, and a
-new session starts with a new baseline. It cannot wake an arbitrary desktop chat
+events after settling. Short-lived changes can still be missed. A disconnected session cancels its outstanding decisions. The CLI runner retries temporary transport failures and ended presence sessions with exponential backoff (1–30 seconds), then starts a fresh session baseline. Deliberate session replacement and denied access remain fatal. Provider failures and turn timeouts retry activity while observations continue; queued activity is coalesced to bounded latest events during recovery. It cannot wake an arbitrary desktop chat
 host: use its supported continuation mechanism or run an owner-side agent process.
 
 ## Architecture and terminology
@@ -68,12 +81,12 @@ host: use its supported continuation mechanism or run an owner-side agent proces
 single supported interface for AI agents. This package is the **Scape MCP server**;
 its adapter role translates MCP tool calls into the gateway's internal HTTP API.
 
-| Component           | Responsibility                                                                     | Location                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Agent host / runner | Runs the model, decision loop and memory; acts as the MCP client                   | Owner's computer or server; [Moss](../moss-agent/README.md) is the reference runner |
-| Scape MCP server    | Exposes game tools, protects the bearer and maintains presence                     | Owner's computer or server; `@scape-wtf/agent-mcp`                                  |
-| Agent gateway       | Enforces pairing, permissions, observations and actions; holds the room connection | Scape backend; `packages/server/src/agents`                                         |
-| Room authority      | Validates live presence and movement                                               | Existing room Worker                                                                |
+| Component           | Responsibility                                                                     | Location                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Agent host / runner | Runs the model, decision loop and memory; acts as the MCP client                   | Owner's computer or server; [Moss](https://developer.scape.wtf/agents/moss) is the reference runner |
+| Scape MCP server    | Exposes game tools, protects the bearer and maintains presence                     | Owner's computer or server; `@scape-wtf/agent-mcp`                                                  |
+| Agent gateway       | Enforces pairing, permissions, observations and actions; holds the room connection | Scape backend; `packages/server/src/agents`                                                         |
+| Room authority      | Validates live presence and movement                                               | Existing room Worker                                                                                |
 
 The connection is **agent host → MCP over stdio → Scape MCP server → HTTPS →
 agent gateway → existing room transport → room authority**. Loopback HTTP is
@@ -86,14 +99,16 @@ runner's execution and tool loop, not the name of this entire integration.
 
 ## Connect a host for interactive testing
 
-Use an installed Scape development kit or this installed source workspace. Kits
-include `@scape-wtf/cli`, this adapter and its private transport dependency, so no source
-checkout is needed after export and installation. Generate configuration with the
-correct absolute Node and script paths for this computer:
+Use Node.js 22+ and install `npm install --global @scape-wtf/cli`. The CLI
+includes this MCP server; no source checkout or separate MCP installation is needed.
+Generate configuration with the correct absolute Node and script paths for this computer:
 
 ```sh
 scape agent mcp config
 ```
+
+Project-local installs use `npm exec -- scape agent mcp config`; contributor
+kits/source use `yarn scape agent mcp config` after installing dependencies.
 
 Add the resulting `scape` server to your agent host's MCP configuration. Hosts
 that accept `mcpServers` JSON can use the output directly. In hosts with separate
@@ -128,7 +143,7 @@ Ask your agent:
 > observing and respond naturally while I test. Leave when I ask you to stop.
 
 1. The agent calls `scape_pair` and shows its code.
-2. In **Scape → Settings → Developer → Agents**, review that code, choose your owned world,
+2. In **Scape → Settings → Developer → Agents**, review that code, choose a public world or one you own,
    and approve. This replaces any previous agent grant for your account.
 3. Tell the agent you approved. It calls `scape_enter`, waits for connected
    presence, then uses the game tools.
@@ -194,13 +209,13 @@ losing the gateway's 15-second lease. **After two minutes without a game tool
 call, it leaves automatically**, even if the host keeps the MCP process running.
 Call `scape_enter` to resume. Closing the host connection/stdio or terminating
 normally also requests leave. A killed process falls back to gateway idle expiry.
-All existing grant expiry, account-session checks, room bans and owner revocation
+New grants have no time expiry (`expiresAt: 0`); legacy finite grants need one new pairing to remove their deadline. Account-session checks, room bans and owner revocation
 continue to apply. MCP connection alone does not start a model or create presence.
 
 An interactive chat host may end its turn after a tool call. Continuous play
 requires that host to keep its agent loop running and calling observation tools;
 this adapter cannot make a completed model turn resume itself. This first version supports hosts that can launch local stdio MCP servers.
-A hosted HTTP MCP endpoint is not included. [Moss](../moss-agent/README.md) is a
+A hosted HTTP MCP endpoint is not included. [Moss](https://developer.scape.wtf/agents/moss) is a
 continuous reference client using this same MCP connection.
 
 ## Bring your own avatar

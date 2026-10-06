@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
+import { connectionDetails, connectionFailure, recoveryDelay } from './recovery.mjs';
 
 const actions = new Set([
   'scape_speak',
@@ -26,6 +27,8 @@ export function mcpTools(client) {
       if (result.isError) {
         const error = new Error(value.error || `Scape tool ${name} failed`);
         if (typeof value.code === 'string') error.code = value.code;
+        if (Number.isInteger(value.status)) error.status = value.status;
+        Object.assign(error, connectionDetails(value));
         throw error;
       }
       return value;
@@ -112,7 +115,8 @@ export async function runAgentSession({
     failure,
     running = false,
     events = [],
-    turnController;
+    turnController,
+    providerFailures = 0;
   let thinking = false,
     displayedText = observation.self?.text ?? '',
     pendingText,
@@ -128,6 +132,15 @@ export async function runAgentSession({
       failure = error;
       stop();
     }
+  };
+  const latestEvents = pending => {
+    const latest = new Map();
+    for (const event of pending) {
+      const key = event.type === 'speech' ? `speech:${event.player.id}` : event.type;
+      latest.delete(key);
+      latest.set(key, event);
+    }
+    return [...latest.values()].slice(-maxPendingEvents);
   };
   const scopedTools = {
     async call(name, args = {}, options = {}) {
@@ -159,6 +172,9 @@ export async function runAgentSession({
           displayedText = previousText;
           pendingText = previousPending;
         }
+        // Stop all decisions immediately on transport/access loss. The owner
+        // runner may re-enter only after checking the current grant again.
+        if (connectionFailure(error) || [401, 403].includes(error.status)) fail(error);
         throw error;
       }
     },
@@ -235,8 +251,22 @@ export async function runAgentSession({
         turnSignal.throwIfAborted();
         return agent.onTurn({ observation, events: batch }, turnContext);
       })
-      .catch(error => {
-        if (!pending.signal.aborted) fail(error);
+      .then(() => {
+        providerFailures = 0;
+      })
+      .catch(async error => {
+        if (pending.signal.aborted || controller.signal.aborted) return;
+        if (error.code !== 'provider_unavailable') {
+          fail(error);
+          return;
+        }
+        // Keep observing during cooldown; replay activity, never dispatched tools.
+        events = latestEvents([...batch, ...events]);
+        try {
+          await delay(recoveryDelay(providerFailures++), undefined, { signal: turnSignal });
+        } catch {
+          // A stop, disconnect or social interruption cancels the cooldown.
+        }
       })
       .finally(() => {
         running = false;
@@ -248,7 +278,10 @@ export async function runAgentSession({
     if (state.sessionId !== initialObservation.sessionId)
       throw new Error('Agent session changed; start a new session');
     if (state.status !== 'connected' && state.status !== 'connecting')
-      throw new Error('Agent disconnected');
+      throw Object.assign(new Error('Agent disconnected'), {
+        code: 'connection_lost',
+        ...connectionDetails({ operation: 'observe', reason: `world_${state.status}` }),
+      });
     observation = state;
     const observedText = state.self?.text ?? '';
     // A poll already in flight may still contain the preceding bubble. Do not
@@ -263,6 +296,7 @@ export async function runAgentSession({
     events = events.filter(event => event.type !== 'speech' || visible.has(event.player.id));
     if (agent.onTurn) {
       events.push(...changes);
+      if (providerFailures) events = latestEvents(events);
       if (events.length > maxPendingEvents)
         throw new Error('Agent event queue is full; runner stopped');
     }
@@ -305,6 +339,9 @@ export async function runAgentSession({
     // Do not wait for an uncooperative model before withdrawing presence.
     try {
       await tools.call('scape_leave');
+    } catch {
+      // Presence expires server-side if leave cannot be delivered. Cleanup must
+      // neither replace a revocation nor turn a voluntary stop into a reconnect.
     } finally {
       await agent?.close?.();
     }

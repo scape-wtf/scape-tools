@@ -8,7 +8,8 @@ Speak using scape_speak; ordinary assistant prose is private and will not appear
 Use the current confirmed position and observed player/object IDs. Movement acceptance is not arrival: check observations. Use follow/approach for player targets and the handbook for mechanics. You can explore and converse using these same tools.
 Respect stops, departures and requests for space. You have no file, shell, wallet or account tools. Never claim to have done an action without confirmation. Use scape_leave to end participation when appropriate.
 The runtime keeps listening after you finish a turn. Existing bubbles on entry are context, not new messages. Current activity and observations are supplied as JSON data.
-Finish the turn when your reply or requested action is complete. Do not poll observe repeatedly, issue wait/stop to end a turn, or clear a reply just to go idle. The runtime handles listening, thinking indication and speech expiry; scape_stop also clears visible speech. Use stop or quiet controls only when actually requested or needed to interrupt an action.`;
+Finish the turn when your reply or requested action is complete. Do not poll observe repeatedly, issue wait/stop to end a turn, or clear a reply just to go idle. The runtime handles listening, thinking indication and speech expiry; scape_stop also clears visible speech. Use stop or quiet controls only when actually requested or needed to interrupt an action.
+Recovery context may list actions already confirmed during an interrupted turn. Do not repeat those actions or republish an already confirmed reply.`;
 
 function providerToolSchema(schema) {
   // MCP/Zod validates Unicode property escapes with the JS `u` flag. Model APIs
@@ -158,7 +159,7 @@ export function createModelPolicy({
   const turns = [];
   const infer = async (instructions, history, definitions, signal) => {
     signal.throwIfAborted();
-    if (budget.calls >= limits.maxModelCalls)
+    if (limits.maxModelCalls !== 0 && budget.calls >= limits.maxModelCalls)
       throw new Error(
         'Agent model-call budget reached. Review limits.maxModelCalls before restarting.',
       );
@@ -182,51 +183,57 @@ export function createModelPolicy({
     } else if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     onState('thinking');
     budget.calls++;
-    let response;
     try {
-      response = await fetchImpl(provider.baseUrl + request.path, {
-        method: 'POST',
-        headers,
-        body,
-        signal,
-        redirect: 'error',
-        credentials: 'omit',
-      });
-    } catch {
-      signal.throwIfAborted();
-      throw new Error(
-        'Cannot reach the configured model provider. Check its endpoint and connection.',
-      );
-    }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error(
-        `Model provider returned HTTP ${response.status}. Check credentials, model access, quota and provider compatibility.`,
-      );
-    }
-    // Provider response bodies and credentials are never written to logs.
-    const reader = response.body.getReader();
-    let bytes = 0;
-    const chunks = [];
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.length;
-        if (bytes > 2_000_000)
-          throw new Error('Model provider response exceeded the runner limit.');
-        chunks.push(value);
+      let response;
+      try {
+        response = await fetchImpl(provider.baseUrl + request.path, {
+          method: 'POST',
+          headers,
+          body,
+          signal,
+          redirect: 'error',
+          credentials: 'omit',
+        });
+      } catch {
+        signal.throwIfAborted();
+        throw new Error(
+          'Cannot reach the configured model provider. Check its endpoint and connection.',
+        );
       }
-    } finally {
-      await reader.cancel();
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new Error(
+          `Model provider returned HTTP ${response.status}. Check credentials, model access, quota and provider compatibility.`,
+        );
+      }
+      // Provider response bodies and credentials are never written to logs.
+      const reader = response.body.getReader();
+      let bytes = 0;
+      const chunks = [];
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.length;
+          if (bytes > 2_000_000)
+            throw new Error('Model provider response exceeded the runner limit.');
+          chunks.push(value);
+        }
+      } finally {
+        await reader.cancel();
+      }
+      let payload;
+      try {
+        payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch {
+        throw new Error('Model provider returned invalid JSON.');
+      }
+      return readReply(provider.type, payload);
+    } catch (error) {
+      signal.throwIfAborted();
+      // Provider errors are recoverable; preserve no response body or credentials.
+      throw Object.assign(new Error(error.message), { code: 'provider_unavailable' });
     }
-    let payload;
-    try {
-      payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
-      throw new Error('Model provider returned invalid JSON.');
-    }
-    return readReply(provider.type, payload);
   };
   const reviewTool = {
     name: 'agent_review_reply',
@@ -301,6 +308,7 @@ export function createModelPolicy({
       // No inference while alone. The active observer still maintains presence.
       if (!(context.observation.roster ?? context.observation.players).length) return;
       const signal = AbortSignal.any([context.signal, AbortSignal.timeout(limits.turnTimeoutMs)]);
+      const evidence = [];
       try {
         await context.setThinking?.(true);
         if (budget.nextTurn > Date.now())
@@ -323,7 +331,6 @@ export function createModelPolicy({
         const type = provider.type;
         let rejectedDrafts = 0,
           published = false;
-        const evidence = [];
         const fallback = async () => {
           signal.throwIfAborted();
           const text =
@@ -355,16 +362,22 @@ export function createModelPolicy({
             turns.push(current);
             while (turns.length > limits.historyTurns) turns.shift();
             onState('listening');
-            onStatus(`Listening · ${budget.calls}/${limits.maxModelCalls} model calls used`);
+            onStatus(
+              `Listening · ${budget.calls} model calls used${limits.maxModelCalls === 0 ? ' · unlimited' : ` / ${limits.maxModelCalls}`}`,
+            );
             return;
           }
           if (reply.calls.length > 8)
-            throw new Error('Model requested too many actions in one response.');
+            throw Object.assign(new Error('Model requested too many actions in one response.'), {
+              code: 'provider_unavailable',
+            });
           const results = [];
           for (const call of reply.calls) {
             signal.throwIfAborted();
             if (typeof call.id !== 'string' || !call.id)
-              throw new Error('Model returned a tool call without an ID.');
+              throw Object.assign(new Error('Model returned a tool call without an ID.'), {
+                code: 'provider_unavailable',
+              });
             let value,
               error = false;
             try {
@@ -451,6 +464,26 @@ export function createModelPolicy({
         while (turns.length > limits.historyTurns) turns.shift();
         onState('listening');
         onStatus(`Paused after ${limits.maxToolRounds} tool rounds · still listening`);
+      } catch (error) {
+        context.signal.throwIfAborted();
+        if (error.code !== 'provider_unavailable' && !signal.aborted) throw error;
+        // Retain only acknowledged outcomes, never incomplete provider tool calls.
+        if (evidence.length) {
+          turns.push([
+            {
+              role: 'user',
+              content: JSON.stringify({ kind: 'interrupted_turn', confirmedTools: evidence }),
+            },
+          ]);
+          while (turns.length > Math.max(1, limits.historyTurns)) turns.shift();
+        }
+        onState('recovering');
+        onStatus(
+          'Conversation provider unavailable or turn timed out · retrying with backoff while listening.',
+        );
+        throw Object.assign(new Error('Conversation provider unavailable.'), {
+          code: 'provider_unavailable',
+        });
       } finally {
         await context.setThinking?.(false);
       }

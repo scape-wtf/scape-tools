@@ -340,6 +340,20 @@ test('model budget bounds repeated tool calls', async () => {
   assert.equal(calls, 1);
 });
 
+test('FR-153: zero means unlimited requests, including after a shared budget exceeds the old ceiling', async () => {
+  const budget = { calls: 100001, nextTurn: 0 };
+  const policy = createModelPolicy({
+    config: config('openai', { maxModelCalls: 0 }),
+    toolDefinitions: definitions,
+    budget,
+    fetchImpl: async () => response(reply('openai')),
+  });
+  await policy.onTurn({ events: [] }, context());
+  assert.equal(budget.calls, 100002);
+  assert.equal(config('openai').limits.maxModelCalls, 200);
+  assert.throws(() => config('openai', { maxModelCalls: -1 }));
+});
+
 test('BUG-156: tool-round exhaustion ends the decision, retains results and listens for the next event', async () => {
   const c = context(),
     messages = [],

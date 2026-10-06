@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
 export const decisionPresets = {
+  openrouter: {
+    baseUrl: 'https://openrouter.ai/api/alpha/decisions',
+    model: 'typesafe/jev-1.13',
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+  },
   typesafe: {
     baseUrl: 'https://api.typesafe.ai/v1/systemone',
     model: 'jev-latest',
@@ -56,7 +61,10 @@ export function normalizeDecision(config, validateEndpoint) {
   config.model ??= defaults.model;
   if (!config.model) throw new Error('Set decision.model to a model supported by your endpoint.');
   config.baseUrl = validateEndpoint(config.baseUrl ?? defaults.baseUrl);
-  if (['typesafe', 'cloudflare'].includes(config.type) && config.baseUrl !== defaults.baseUrl)
+  if (
+    ['openrouter', 'typesafe', 'cloudflare'].includes(config.type) &&
+    config.baseUrl !== defaults.baseUrl
+  )
     throw new Error(
       'Named decision providers use their official endpoint. Choose system-one for a custom server.',
     );

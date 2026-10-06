@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node ../../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test test/*.test.mjs",
-    "dev": "node ../../../packages/scape-cli/cli.mjs gizmo dev"
+    "dev": "scape gizmo dev"
   },
   "dependencies": {
-    "@scape-wtf/sdk": "0.1.0"
+    "@scape-wtf/sdk": "0.1.1"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
-    "@scape-wtf/cli": "0.1.1"
+    "@scape-wtf/cli": "0.1.4"
   },
   "scape": {
     "entry": "src/project.ts"

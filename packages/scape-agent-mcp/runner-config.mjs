@@ -79,7 +79,7 @@ const schema = z
         maxToolRounds: z.number().int().min(1).max(20).default(8),
         maxOutputTokens: z.number().int().min(128).max(16384).default(2048),
         historyTurns: z.number().int().min(0).max(20).default(4),
-        maxModelCalls: z.number().int().min(1).max(100000).default(200),
+        maxModelCalls: z.number().int().min(0).max(100000).default(200),
         minTurnIntervalMs: z.number().int().min(500).max(60000).default(5000),
       })
       .strict()

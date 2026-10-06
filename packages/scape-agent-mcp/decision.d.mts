@@ -1,5 +1,5 @@
 export interface DecisionConfig {
-  type: 'typesafe' | 'cloudflare' | 'system-one' | 'openai-compatible' | 'custom';
+  type: 'openrouter' | 'typesafe' | 'cloudflare' | 'system-one' | 'openai-compatible' | 'custom';
   model?: string;
   baseUrl?: string;
   apiKeyEnv?: string | null;

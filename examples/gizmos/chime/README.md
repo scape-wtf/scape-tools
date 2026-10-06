@@ -14,11 +14,10 @@ source alongside the other object examples.
 
 Edit `src/definition.ts`; `src/project.ts` exposes it to the SDK loader.
 Scape owns permission checks, shared delivery, rendering and protected audio.
-After installing root dependencies and running `npm run build:gizmos`, run
-`npm run build` and `npm test` here. Pair with
-`npm run dev`.
-Export from the root with
-`npm exec -- scape gizmo init /absolute/path/my-chime --template chime`.
+See [Run an example](https://developer.scape.wtf/examples/gizmos/chime#run-this-example) for public setup and making an
+independent copy. Inside this example directory, run `npm run build`, `npm test`
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
+use `--origin <https-url>` only for another compatible host.
 
 The package tests verify cooldown and accepted-action feedback. Use the server
 `gizmoEvents.integration.test.ts` and `roomRealtime.test.ts` checks for validation. The latter

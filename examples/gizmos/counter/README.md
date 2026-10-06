@@ -9,11 +9,10 @@ placement; neither action is moved into the popover action row.
 shared state, identity, permissions and popover UI; the example imports only
 `@scape-wtf/sdk`.
 
-After installing root dependencies and running `npm run build:gizmos`, run
-`npm run build` and `npm test` here. Use
-`npm run dev` to pair edits.
-Export with `npm exec -- scape gizmo init /absolute/path/my-counter --template counter` at
-the repository root, then install and test inside the exported project.
+See [Run an example](https://developer.scape.wtf/examples/gizmos/counter#run-this-example) for public setup and making an
+independent copy. Inside this example directory, run `npm run build`, `npm test`
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
+use `--origin <https-url>` only for another compatible host.
 
 Tests cover participant increments, editor-only reset and the upper bound.
 In the developer world, place Counter and try those actions with two players.

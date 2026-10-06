@@ -5,6 +5,43 @@ const flush = async () => {
   for (let i = 0; i < 12; i++) await Promise.resolve();
 };
 
+test('transport retains safe timeout, DNS, socket and HTTP diagnostics without network details', async () => {
+  for (const [failure, reason] of [
+    [new DOMException('PRIVATE_TIMEOUT', 'TimeoutError'), 'request_timeout'],
+    [new TypeError('PRIVATE_DNS', { cause: { code: 'ENOTFOUND' } }), 'dns_failure'],
+    [new TypeError('PRIVATE_RESET', { cause: { code: 'ECONNRESET' } }), 'connection_reset'],
+    [new TypeError('PRIVATE_REFUSED', { cause: { code: 'ECONNREFUSED' } }), 'connection_refused'],
+    [new TypeError('PRIVATE_SOCKET', { cause: { code: 'UND_ERR_SOCKET' } }), 'socket_closed'],
+    [new TypeError('PRIVATE_TLS', { cause: { code: 'CERT_HAS_EXPIRED' } }), 'tls_failure'],
+    [new Error('PRIVATE_UNKNOWN'), 'network_error'],
+  ]) {
+    const agent = new ScapeAgent({
+      origin: 'https://scape.test',
+      request: async () => {
+        throw failure;
+      },
+    });
+    await assert.rejects(agent.observe(), error => {
+      assert.equal(error.code, 'connection_lost');
+      assert.equal(error.operation, 'observe');
+      assert.equal(error.reason, reason);
+      assert.doesNotMatch(JSON.stringify(error) + error.message, /PRIVATE_/);
+      return true;
+    });
+  }
+  const agent = new ScapeAgent({
+    origin: 'https://scape.test',
+    request: async () => new Response('PRIVATE_PROXY_BODY', { status: 502 }),
+  });
+  await assert.rejects(
+    agent.observe(),
+    error =>
+      error.status === 502 &&
+      error.reason === 'unreadable_response' &&
+      error.operation === 'observe',
+  );
+});
+
 test('runner keeps pairing credentials out of returned data and scopes commands to the admitted session', async () => {
   const calls = [];
   const agent = new ScapeAgent({

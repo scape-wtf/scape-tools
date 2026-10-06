@@ -25,7 +25,7 @@ Aliases: scape init, scape dev
 
 Gizmo development connects to your Scape developer world at https://scape.wtf by default and uploads changes. Use --origin for another host.
 Agent run walks you through setup and pairing, then keeps your agent listening.
-Settings and access are saved locally. No agent project or install step required.
+Settings and access are saved locally. Once the CLI is installed, no agent project or per-agent install step is required.
 Providers: openai, anthropic, openrouter, xai, gemini, ollama, lmstudio, openai-compatible.
 Agent init <directory> exports an optional project for custom agent code.
 Agent mcp config/serve support interactive testing in another harness. Pairing stays separate.
@@ -144,7 +144,9 @@ export async function main(args = process.argv.slice(2)) {
     } finally {
       ui.clear();
     }
-    ui.success(`Created ${output}. Run npm install, npm run build, then npm run dev.`);
+    ui.success(
+      `Created ${output}. In that directory, run npm install, npm run build, then npm exec -- scape gizmo dev.`,
+    );
     return;
   }
   if (

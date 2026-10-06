@@ -9,6 +9,9 @@ offset and landing offsets in `src/definition.ts` to try other movement patterns
 The host validates movement, cooldown and collisions; the recipe cannot switch
 worlds or floors or move someone else.
 
-Run `npm run build`, `npm test`, or `npm run dev` here.
 The example is included in every developer-world sidebar and palette.
-Export it with `npm exec -- scape gizmo init /absolute/path/jump-pad --template jump-pad`.
+
+See [Run an example](https://developer.scape.wtf/examples/gizmos/jump-pad#run-this-example) for public setup and making an
+independent copy. Inside this example directory, run `npm run build`, `npm test`
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
+use `--origin <https-url>` only for another compatible host.

@@ -1,9 +1,10 @@
 import path from 'node:path';
 import { stat } from 'node:fs/promises';
-import { decisionPresets, validateEndpoint } from '@scape-wtf/agent-mcp/runner';
+import { decisionPresets, providerPresets, validateEndpoint } from '@scape-wtf/agent-mcp/runner';
 
 const options = [
   { value: 'none', label: 'None · use shared rules and your conversation model' },
+  { value: 'openrouter', label: 'OpenRouter · JEV' },
   { value: 'cloudflare', label: 'Cloudflare · Clef / Clef-flash' },
   { value: 'typesafe', label: 'TypeSafe · JEV' },
   { value: 'system-one', label: 'Another System One-compatible endpoint' },
@@ -14,9 +15,22 @@ const modelId = v => {
   if (!v || v.length > 200 || /[\p{Cc}\p{Cf}]/u.test(v))
     throw new Error('Use a model ID up to 200 characters without control characters.');
 };
-export async function configureDecision({ previous, ui, env = process.env, signal }) {
+export async function configureDecision({
+  previous,
+  provider,
+  providerKey,
+  ui,
+  env = process.env,
+  signal,
+}) {
   const old = previous?.config.decision;
-  const type = await ui.choose('Decision model', options, old?.type ?? 'none');
+  const openrouter =
+    provider?.type === 'openrouter' && provider.baseUrl === providerPresets.openrouter.baseUrl;
+  const type = await ui.choose(
+    'Decision model',
+    options,
+    old?.type ?? (openrouter ? 'openrouter' : 'none'),
+  );
   if (type === 'none') return {};
   const preset = decisionPresets[type],
     sameType = old?.type === type;
@@ -81,7 +95,7 @@ export async function configureDecision({ previous, ui, env = process.env, signa
       })) || undefined;
     if (baseUrl) baseUrl = validateEndpoint(baseUrl);
   } else {
-    if (type !== 'typesafe')
+    if (!['typesafe', 'openrouter'].includes(type))
       baseUrl = validateEndpoint(
         await ui.ask(
           type === 'system-one'
@@ -98,6 +112,15 @@ export async function configureDecision({ previous, ui, env = process.env, signa
   const sameProvider =
     sameType && old.baseUrl === baseUrl && old.accountId === accountId && old.adapter === adapter;
   const savedKey = sameProvider ? previous.decisionKey : undefined;
+  const canReuse =
+    type === 'openrouter' &&
+    openrouter &&
+    (providerKey || (provider.apiKeyEnv && env[provider.apiKeyEnv]));
+  const reusedBefore =
+    sameProvider &&
+    previous?.config.provider?.type === 'openrouter' &&
+    ((savedKey && savedKey === previous.providerKey) ||
+      (!savedKey && old.apiKeyEnv === previous.config.provider.apiKeyEnv));
   let apiKeyEnv = sameProvider ? old.apiKeyEnv : preset.apiKeyEnv,
     decisionKey;
   if (type === 'custom')
@@ -111,6 +134,7 @@ export async function configureDecision({ previous, ui, env = process.env, signa
         },
       })) || null;
   const keyOptions = [
+    ...(canReuse ? [{ value: 'conversation', label: 'Use conversation OpenRouter key' }] : []),
     {
       value: 'enter',
       label: savedKey ? 'Keep or replace saved decision key' : 'Enter decision API key (hidden)',
@@ -118,20 +142,30 @@ export async function configureDecision({ previous, ui, env = process.env, signa
   ];
   if (apiKeyEnv && env[apiKeyEnv])
     keyOptions.push({ value: 'env', label: `Use ${apiKeyEnv} from the environment` });
-  if (!['typesafe', 'cloudflare'].includes(type))
+  if (!['openrouter', 'typesafe', 'cloudflare'].includes(type))
     keyOptions.push({ value: 'none', label: 'No authentication required' });
   const credentials = await ui.choose(
     'Decision credentials',
     keyOptions,
-    savedKey
-      ? 'enter'
-      : apiKeyEnv && env[apiKeyEnv]
-        ? 'env'
-        : (sameProvider && old.apiKeyEnv === null) || (type === 'custom' && !apiKeyEnv)
-          ? 'none'
-          : 'enter',
+    canReuse && (!sameProvider || reusedBefore)
+      ? 'conversation'
+      : savedKey
+        ? 'enter'
+        : apiKeyEnv && env[apiKeyEnv]
+          ? 'env'
+          : (sameProvider && old.apiKeyEnv === null) || (type === 'custom' && !apiKeyEnv)
+            ? 'none'
+            : 'enter',
   );
-  if (credentials === 'none') apiKeyEnv = null;
+  if (credentials === 'conversation') {
+    if (!canReuse) throw new Error('Choose an available decision credential option.');
+    apiKeyEnv = provider.apiKeyEnv;
+    decisionKey = providerKey;
+    ui.line(
+      'Uses your conversation OpenRouter key. Decision requests have a separate limit.',
+      'muted',
+    );
+  } else if (credentials === 'none') apiKeyEnv = null;
   else if (credentials === 'enter') {
     apiKeyEnv ??= 'SCAPE_DECISION_API_KEY';
     ui.line(

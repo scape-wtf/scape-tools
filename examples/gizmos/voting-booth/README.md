@@ -1,8 +1,9 @@
 # Voting booth starter
 
-Inside this repository, you can run `npm run dev` directly
-from this example directory after the root dependencies are installed. `npm run build`
-and `npm test` also use the repository tools. The public packages are available from npm. For an independent project, use `npx @scape-wtf/cli@latest gizmo init my-gizmo`; source contributors can still use the repository exporter.
+See [Run an example](https://developer.scape.wtf/examples/gizmos/voting-booth#run-this-example) for public setup and making an
+independent copy. Inside this example directory, run `npm run build`, `npm test`
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
+use `--origin <https-url>` only for another compatible host.
 
 Gizmos are things you place in Scape that do something. The current API defines them with
 `defineObject` and collects them with `defineProject({ objects: [...] })`.
@@ -10,20 +11,9 @@ Gizmos are things you place in Scape that do something. The current API defines 
 Build and test a Scape gizmo using only the SDK. This project does not need the game
 source, a Scape account, a running world, a tunnel or a VPN.
 
-For a public project, scaffold directly with the published CLI:
-
-```sh
-npx @scape-wtf/cli@latest gizmo init my-project
-```
-
-Choose a new directory that does not already exist. The generated project uses the published SDK and CLI packages.
-
-In the generated project (Node 22+ and npm):
-
-```sh
-npm install
-npm test
-```
+For an independent voting project, copy this example as described in the
+[public example setup](https://developer.scape.wtf/examples/gizmos/voting-booth#run-this-example), then install and test there.
+The public CLI’s `gizmo init` creates a blank project without voting behavior or tests.
 
 Edit `src/definition.ts`, then run `npm test` again. `npm run build` produces plain ESM
 and declarations in `dist`. Tests exercise two voters, changing a vote, saved state,
@@ -40,19 +30,20 @@ old submissions are rejected.
 To see edits in your hosted Scape developer world, run:
 
 ```sh
-npm run dev
+npm exec -- scape gizmo dev
 ```
 
-The exported `dev` script runs `scape gizmo dev`. The same installed kit also
-supports `scape agent mcp config`;
+The project’s `dev` script runs `scape gizmo dev`. Its local CLI also
+supports `npm exec -- scape agent mcp config`;
 agent pairing is separate from this project's upload grant.
 
 For a local desktop Scape server, use `http://127.0.0.1:3000`. Open the printed link,
-sign in, compare the pairing code with your terminal, and choose **Connect this project**
+sign in, compare the pairing code with your terminal, and choose **Connect project**
 in the developer sidebar. Change a button label, save, and watch the existing booth's
 controls update while votes stay intact. Your host must run the current developer-link backend.
 
-The CLI bundles the default export from `src/definition.ts`. Compilation/validation errors
+The CLI bundles the project default export from `src/project.ts`, which registers
+the voting definition from `src/definition.ts`. Compilation/validation errors
 keep the previous accepted build active. Keep the booth's type, emoji and state version;
 existing saved state must remain valid. Stopping the command disconnects live updates without
 deleting the world or accepted build. Sessions expire after two hours and can be revoked

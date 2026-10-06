@@ -18,6 +18,7 @@ import {
 import { loadAgentPolicy } from './policy-loader.mjs';
 import { openEncounterMemory } from './encounters.mjs';
 import { createDecisionClient } from './decision.mjs';
+import { recoverConnection, connectionRetryMessage } from './recovery.mjs';
 export {
   providerPresets,
   decisionPresets,
@@ -111,15 +112,7 @@ export async function runAgent({
       );
       log(`Approve code ${pair.code} in Scape → Settings → Developer → Agents.`);
     }
-    let entry;
-    do {
-      entry = await tools.call('scape_enter', {}, { signal: shutdown.signal });
-      if (!entry.entered) await delay(1500, undefined, { signal: shutdown.signal });
-    } while (!entry.entered);
-    await tools.call('scape_set_avatar', config.avatar, { signal: shutdown.signal });
     const { tools: toolDefinitions } = await client.listTools();
-    onState('listening');
-    log(`${config.name} is running. Ctrl+C leaves the world.`);
     const budget = { calls: 0, nextTurn: 0 },
       memories = new Map();
     const shared = !policyFactory && config.behavior.enabled;
@@ -166,23 +159,37 @@ export async function runAgent({
           })
         : policy;
     };
-    if (shared)
-      await runAgentPresence({
-        tools,
-        initialObservation: entry.observation,
-        signal: shutdown.signal,
-        createAgent,
-        sleepAfterMs: config.behavior.sleepAfterMs,
-        wakeIntervalMs: config.behavior.wakeIntervalMs,
-        onState,
-      });
-    else
-      await runAgentSession({
-        tools,
-        initialObservation: entry.observation,
-        signal: shutdown.signal,
-        createAgent,
-      });
+    await recoverConnection({
+      signal: shutdown.signal,
+      onRetry: (milliseconds, error) => {
+        onState('recovering');
+        log(connectionRetryMessage(error, milliseconds));
+      },
+      connect: async () => {
+        onState('connecting');
+        let entry;
+        do {
+          entry = await tools.call('scape_enter', {}, { signal: shutdown.signal });
+          if (!entry.entered) await delay(1500, undefined, { signal: shutdown.signal });
+        } while (!entry.entered);
+        await tools.call('scape_set_avatar', config.avatar, { signal: shutdown.signal });
+        onState('listening');
+        log(`${config.name} is running. Ctrl+C leaves the world.`);
+        return entry.observation;
+      },
+      run: initialObservation =>
+        shared
+          ? runAgentPresence({
+              tools,
+              initialObservation,
+              signal: shutdown.signal,
+              createAgent,
+              sleepAfterMs: config.behavior.sleepAfterMs,
+              wakeIntervalMs: config.behavior.wakeIntervalMs,
+              onState,
+            })
+          : runAgentSession({ tools, initialObservation, signal: shutdown.signal, createAgent }),
+    });
   } catch (error) {
     if (!shutdown.signal.aborted) {
       // Custom code may throw sensitive errors; only our bounded operational messages are printable.
