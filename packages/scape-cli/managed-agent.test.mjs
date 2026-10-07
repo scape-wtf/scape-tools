@@ -296,7 +296,7 @@ test('pairing expires without entering a world or revealing its bearer', async t
 });
 
 test(
-  'saved profile runs from any directory, reuses approval, reports status and shuts down through MCP',
+  'BUG-180: decorated world names preserve saved approval across status and repeated runs',
   { timeout: 20000 },
   async t => {
     const directory = await temp(t);
@@ -333,7 +333,8 @@ test(
           paired++;
           result = { secret: 'SAVED_GRANT', code: 'APPROVECODE', expiresAt: Date.now() + 300000 };
         }
-        if (req.url === '/api/agents/link/poll') result = { approved: true, room: 'world' };
+        if (req.url === '/api/agents/link/poll')
+          result = { approved: true, room: 'world', name: 'Scout · AI' };
         if (req.url === '/api/agents/enter') {
           entered++;
           result = observation;
@@ -364,12 +365,22 @@ test(
     await managedAgent('login', { directory, ui });
     assert.equal(entered, 0);
     assert.equal((await readProfile(directory)).grant.token, 'SAVED_GRANT');
+    assert.equal(
+      (await readProfile(directory)).grant.name,
+      'Scout',
+      'BUG-180: retain the configured name rather than the decorated world name',
+    );
     const afterLogin = calls;
     await managedAgent('status', { directory, ui });
     assert.equal(entered, 0);
     assert.equal(calls, afterLogin + 1);
     assert.doesNotMatch(ui.lines.join('\n'), /SAVED_GRANT|PROVIDER_SECRET/);
     for (let run = 0; run < 2; run++) {
+      if (run === 1) {
+        const legacy = await readProfile(directory);
+        legacy.grant.name = 'Scout · AI';
+        await saveProfile(directory, legacy);
+      }
       const child = spawn(process.execPath, [cli, 'agent', 'run'], {
         cwd: tmpdir(),
         env: { ...process.env, SCAPE_CLI_HOME: directory, SCAPE_AGENT_TOKEN: 'UNRELATED_GRANT' },
@@ -690,7 +701,8 @@ test(
               },
             ],
           };
-        } else if (req.url === '/api/agents/link/poll') result = { approved: true, room: 'world' };
+        } else if (req.url === '/api/agents/link/poll')
+          result = { approved: true, room: 'world', name: 'Scout · AI' };
         else if (req.url === '/api/agents/enter') {
           enters++;
           const visitor = {
@@ -752,6 +764,11 @@ test(
       assert.fail('CLI memory test timed out');
     };
     for (let run = 0; run < 2; run++) {
+      if (run === 1) {
+        const legacy = await readProfile(directory);
+        legacy.grant.name = 'Scout · AI';
+        await saveProfile(directory, legacy);
+      }
       const child = spawn(process.execPath, [cli, 'agent', 'run'], {
         cwd: tmpdir(),
         env: { ...process.env, SCAPE_CLI_HOME: directory },
@@ -782,3 +799,61 @@ test(
     assert.match(stored, /lastConversation/);
   },
 );
+
+test('FR-160: guided logging setting persists, appears in review/status and can be disabled', async t => {
+  const directory = await temp(t);
+  const ui = fakeUI({
+    'Model provider': 'openrouter',
+    'Tool-capable model ID': 'fixture',
+    'API key (hidden)': 'LOG_SECRET',
+    'Diagnostic logs': 'debug',
+  });
+  const profile = await configureProfile({ directory, ui, env: {} });
+  assert.equal(profile.config.logging.level, 'debug');
+  assert.match(ui.lines.join('\n'), /Logs  Detailed/);
+  const retained = await configureProfile({ directory, previous: profile, ui: fakeUI(), env: {} });
+  assert.equal(retained.config.logging.level, 'debug');
+  const status = fakeUI();
+  await managedAgent('status', { directory, ui: status, env: {} });
+  assert.match(status.lines.join('\n'), /Logs  Detailed/);
+  assert.doesNotMatch(status.lines.join('\n'), /LOG_SECRET/);
+  const disabled = await configureProfile({
+    directory,
+    previous: retained,
+    ui: fakeUI({ 'Diagnostic logs': 'standard' }),
+    env: {},
+  });
+  assert.equal(disabled.config.logging.level, 'standard');
+});
+
+test('BUG-175: private reply traces are off by default, opt in explicitly, persist and can be disabled', async t => {
+  const directory = await temp(t);
+  const profile = await configureProfile({
+    directory,
+    ui: fakeUI({
+      'Model provider': 'openrouter',
+      'Tool-capable model ID': 'fixture',
+      'API key (hidden)': 'TRACE_KEY',
+    }),
+    env: {},
+  });
+  assert.equal(profile.config.logging.traceReplies, false);
+  const ui = fakeUI({ 'Private reply traces': 'on' });
+  const enabled = await configureProfile({ directory, previous: profile, ui, env: {} });
+  assert.equal(enabled.config.logging.traceReplies, true);
+  assert.match(ui.lines.join('\n'), /include dialogue and drafts/);
+  assert.match(ui.lines.join('\n'), /Reply traces  On/);
+  assert.doesNotMatch(ui.lines.join('\n'), /TRACE_KEY/);
+  const retained = await configureProfile({ directory, previous: enabled, ui: fakeUI(), env: {} });
+  assert.equal(retained.config.logging.traceReplies, true);
+  const status = fakeUI();
+  await managedAgent('status', { directory, ui: status, env: {} });
+  assert.match(status.lines.join('\n'), /Reply traces  On/);
+  const disabled = await configureProfile({
+    directory,
+    previous: retained,
+    ui: fakeUI({ 'Private reply traces': 'off' }),
+    env: {},
+  });
+  assert.equal(disabled.config.logging.traceReplies, false);
+});

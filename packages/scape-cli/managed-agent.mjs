@@ -18,6 +18,12 @@ import {
   runningProfile,
 } from './profile.mjs';
 
+// Older profiles saved the server's decorated display name. The grant still
+// needs a successful server check; matching this suffix never bypasses access.
+function grantMatchesName(grant, name) {
+  return grant.name === name || grant.name === `${name} · AI`;
+}
+
 const defaultInstructions =
   'Be a friendly world companion. Respond when addressed, respect requests for space, and use the handbook when explaining the world.';
 
@@ -87,6 +93,18 @@ async function collectProfile({
   );
   ui.line(
     'Remembers visits and greeting timing, never names or conversation transcripts. Shared behavior uses this memory.',
+    'muted',
+  );
+  const conversationNotes = await ui.choose(
+    'Conversation notes',
+    [
+      { value: 'off', label: 'Off · do not save conversation content' },
+      { value: 'on', label: 'On · save only explicit remember requests, for 30 days' },
+    ],
+    previous?.config.memory?.conversationNotes ? 'on' : 'off',
+  );
+  ui.line(
+    'Notes are private to this computer and scoped to the visitor, world and agent. Up to 20 notes per visitor. Inspect and forget them in Memory.',
     'muted',
   );
   const kind = await ui.choose(
@@ -161,6 +179,31 @@ async function collectProfile({
     ? await configureDecision({ previous, provider, providerKey, ui, env, signal })
     : {};
   ui.step('03 / 03', 'Your Scape connection');
+  const logLevel = await ui.choose(
+    'Diagnostic logs',
+    [
+      { value: 'standard', label: 'Standard · status and errors' },
+      { value: 'debug', label: 'Detailed · requests, decisions, reply checks and recovery' },
+    ],
+    previous?.config.logging?.level || 'standard',
+  );
+  ui.line(
+    'Detailed logs exclude API keys, messages, reply drafts and raw provider responses.',
+    'muted',
+  );
+  const traceReplies = await ui.choose(
+    'Private reply traces',
+    [
+      { value: 'off', label: 'Off · keep dialogue out of diagnostic files' },
+      { value: 'on', label: 'On · save drafts and review context locally (1 MiB maximum)' },
+    ],
+    previous?.config.logging?.traceReplies ? 'on' : 'off',
+  );
+  if (traceReplies === 'on')
+    ui.line(
+      'Private traces include dialogue and drafts. Review before sharing; disable after debugging. Known credentials are redacted.',
+      'warning',
+    );
   const gameOrigin = validateEndpoint(
     origin ||
       (await ui.ask('Scape URL', {
@@ -176,11 +219,12 @@ async function collectProfile({
     provider,
     ...(decision ? { decision } : {}),
     behavior,
-    memory: { enabled: memoryEnabled === 'on' },
+    memory: { enabled: memoryEnabled === 'on', conversationNotes: conversationNotes === 'on' },
+    logging: { level: logLevel, traceReplies: traceReplies === 'on' },
     limits: { ...previous?.config.limits, maxModelCalls },
   });
   const grant =
-    previous?.grant?.origin === gameOrigin && previous.grant.name === name
+    previous?.grant?.origin === gameOrigin && grantMatchesName(previous.grant, name)
       ? previous.grant
       : undefined;
   const profile = {
@@ -204,6 +248,8 @@ async function collectProfile({
     `Memory  ${config.memory.enabled && behavior.enabled ? 'Local encounters · 30 days' : 'Temporary only'}`,
   );
   ui.line(`Scape  ${gameOrigin}`);
+  ui.line(`Logs  ${logLevel === 'debug' ? 'Detailed' : 'Standard'}`);
+  ui.line(`Reply traces  ${config.logging.traceReplies ? 'On · private local file' : 'Off'}`);
   ui.line(
     `Request limits  ${maxModelCalls === 0 ? 'Unlimited' : maxModelCalls} conversation${decision ? ` · ${decision.maxRequests} decision` : ''}`,
     'muted',
@@ -218,12 +264,20 @@ async function collectProfile({
       { value: 'save', label: 'Save settings' },
       { value: 'identity', label: 'Change agent and appearance' },
       { value: 'models', label: 'Change models and request limits' },
+      { value: 'logging', label: 'Change diagnostic logs' },
       ...(!origin ? [{ value: 'connection', label: 'Change Scape connection' }] : []),
     ],
     'save',
   );
   if (action !== 'save')
-    ui.jump?.({ identity: 'Name', models: 'Model provider', connection: 'Scape URL' }[action]);
+    ui.jump?.(
+      {
+        identity: 'Name',
+        models: 'Model provider',
+        logging: 'Diagnostic logs',
+        connection: 'Scape URL',
+      }[action],
+    );
   return { profile, assetSource };
 }
 
@@ -231,7 +285,7 @@ async function ensureAccess(profile, directory, { ui, signal, force = false }) {
   if (
     !force &&
     profile.grant?.origin === profile.origin &&
-    profile.grant.name === profile.config.name
+    grantMatchesName(profile.grant, profile.config.name)
   ) {
     ui.busy('Checking saved world access');
     const status = await checkAgentAccess({ origin: profile.origin, token: profile.grant.token });
@@ -261,7 +315,7 @@ async function ensureAccess(profile, directory, { ui, signal, force = false }) {
       ui.busy('Waiting for your approval');
     },
   });
-  profile = { ...profile, grant: { origin: profile.origin, name: profile.config.name, ...access } };
+  profile = { ...profile, grant: { ...access, origin: profile.origin, name: profile.config.name } };
   await saveProfile(directory, profile);
   ui.success('World access saved. Next time, just run scape agent run.');
   return profile;
@@ -269,7 +323,18 @@ async function ensureAccess(profile, directory, { ui, signal, force = false }) {
 
 export async function managedAgent(
   command,
-  { origin, ui = terminal(), directory = profileDirectory(), env = process.env } = {},
+  {
+    origin,
+    ui = terminal(),
+    directory = profileDirectory(),
+    env = process.env,
+    signal,
+    onReady,
+    onEvent,
+    onControls,
+    onLog,
+    onState,
+  } = {},
 ) {
   ui.heading(
     command === 'status'
@@ -284,6 +349,8 @@ export async function managedAgent(
       controller.abort();
       ui.cancel?.();
     };
+  signal?.addEventListener('abort', stop, { once: true });
+  if (signal?.aborted) stop();
   for (const event of ['SIGINT', 'SIGTERM']) process.once(event, stop);
   try {
     if (origin) origin = validateEndpoint(origin, true);
@@ -295,6 +362,8 @@ export async function managedAgent(
         return;
       }
       const config = parseAgentConfig(profile.config);
+      ui.line(`Logs  ${config.logging.level === 'debug' ? 'Detailed' : 'Standard'}`);
+      ui.line(`Reply traces  ${config.logging.traceReplies ? 'On · private local file' : 'Off'}`);
       ui.line(
         `${config.name} · ${config.provider?.type || 'custom policy'} · ${config.provider?.model || ''}`,
       );
@@ -315,7 +384,10 @@ export async function managedAgent(
       ui.line(
         `Provider key  ${profile.providerKey ? 'saved locally' : config.provider?.apiKeyEnv && env[config.provider.apiKeyEnv] ? 'available in environment' : config.provider?.apiKeyEnv === null ? 'not required' : 'missing'}`,
       );
-      if (profile.grant?.origin === profile.origin && profile.grant.name === config.name) {
+      if (
+        profile.grant?.origin === profile.origin &&
+        grantMatchesName(profile.grant, config.name)
+      ) {
         ui.busy('Checking world access');
         const access = await checkAgentAccess({
           origin: profile.origin,
@@ -370,6 +442,7 @@ export async function managedAgent(
       force: command === 'login',
     });
     if (command === 'login') return;
+    onReady?.();
     await runAgent({
       origin: profile.origin,
       directory,
@@ -380,8 +453,14 @@ export async function managedAgent(
       memoryDirectory: directory,
       assetDirectory: profile.assetDirectory,
       signal: controller.signal,
-      log: text => ui.line(text),
+      onEvent,
+      onControls,
+      log: text => (onLog ? onLog(text) : ui.line(text)),
       onState: state => {
+        if (onState) {
+          onState(state);
+          return;
+        }
         if (state === 'sleeping')
           ui.line('World is empty · sleeping until someone returns.', 'muted');
         else if (state === 'connecting') ui.busy('Entering your world');
@@ -397,6 +476,7 @@ export async function managedAgent(
       ui.line('Stopped. Run scape agent run when you’re ready.');
     else throw error;
   } finally {
+    signal?.removeEventListener('abort', stop);
     ui.close();
     await release?.();
     for (const event of ['SIGINT', 'SIGTERM']) process.removeListener(event, stop);

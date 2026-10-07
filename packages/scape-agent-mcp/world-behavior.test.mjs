@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorldBehavior, createBehaviorMemory } from './world-behavior.mjs';
 import { parseAgentConfig } from './runner-config.mjs';
+import { createDecisionClient } from './decision.mjs';
 import { runAgentPresence } from './presence.mjs';
 const player = {
   id: 'human',
@@ -329,6 +330,102 @@ test('local behavior tool handles attention and expression, rejects unknown play
   );
 });
 
+for (const action of [
+  'attend',
+  'quiet',
+  'give_space',
+  'wait',
+  'resume',
+  'express',
+  'mood',
+  'visit',
+  'use',
+]) {
+  test(`behavior tool contract: ${action} has the expected world effect`, async () => {
+    const object = { id: 'piano', emoji: '🎹', x: 8, y: 1, floor: 0 };
+    let result;
+    const f = fixture({
+      policy: {
+        async onTurn(turn, context) {
+          // Let the automatic attention expression settle before an explicit expression.
+          f.advance(2000);
+          if (action === 'resume') await context.tools.call('agent_behavior', { action: 'wait' });
+          result = await context.tools.call('agent_behavior', {
+            action,
+            ...(['attend', 'quiet', 'give_space', 'resume'].includes(action)
+              ? { player: 'human' }
+              : {}),
+            ...(action === 'express' ? { expression: 'happy' } : {}),
+            ...(action === 'mood' ? { mood: 'playful' } : {}),
+            ...(['visit', 'use'].includes(action) ? { target: object.id } : {}),
+          });
+        },
+      },
+    });
+    f.observe({ scene: { floor: 0, blocked: [], objects: [object] } });
+    const p = f.speech('Scout, hello');
+    await f.turn([{ type: 'speech', player: p }]);
+    assert.equal(result.ok, true);
+    if (['attend', 'resume'].includes(action)) {
+      assert.equal(result.focus, 'human');
+      assert.equal(result.waiting, false);
+    }
+    if (['quiet', 'give_space', 'wait', 'resume'].includes(action)) {
+      assert.ok(f.calls.some(call => call.name === 'scape_stop'));
+    }
+    if (['quiet', 'give_space'].includes(action)) assert.equal(result.quiet, true);
+    if (action === 'wait') assert.equal(result.waiting, true);
+    if (action === 'give_space') {
+      const destination = f.calls.find(call => call.name === 'scape_move_to').args;
+      assert.ok(Math.abs(destination.x - player.x) + Math.abs(destination.y - player.y) > 2);
+    }
+    if (action === 'express') {
+      assert.ok(
+        f.calls.some(call => call.name === 'scape_expression' && call.args.expression === 'happy'),
+      );
+    }
+    if (action === 'mood') assert.equal(result.mood, 'playful');
+    if (['visit', 'use'].includes(action)) {
+      const destination = f.calls.find(call => call.name === 'scape_move_to').args;
+      assert.equal(Math.abs(destination.x - object.x) + Math.abs(destination.y - object.y), 1);
+      assert.equal(f.calls.filter(call => call.name === 'scape_interact').length, 0);
+      f.observe({
+        self: { id: 'agent', name: 'Scout', ...destination, text: '' },
+        movement: { status: 'arrived' },
+      });
+      await f.turn();
+      assert.equal(
+        f.calls.filter(call => call.name === 'scape_interact').length,
+        action === 'use' ? 1 : 0,
+      );
+    }
+  });
+}
+
+for (const action of ['visit', 'use']) {
+  test(`BUG-178: wait blocks a ${action} behavior goal until resume`, async () => {
+    const object = { id: 'piano', emoji: '🎹', x: 8, y: 1, floor: 0 };
+    const f = fixture({
+      policy: {
+        async onTurn(turn, context) {
+          await context.tools.call('agent_behavior', { action: 'wait' });
+          await assert.rejects(
+            context.tools.call('agent_behavior', { action, target: object.id }),
+            error => error.code === 'movement_paused',
+          );
+          assert.ok(!f.calls.some(call => call.name === 'scape_move_to'));
+          await context.tools.call('agent_behavior', { action: 'resume', player: 'human' });
+          await context.tools.call('agent_behavior', { action, target: object.id });
+        },
+      },
+    });
+    f.observe({ scene: { floor: 0, blocked: [], objects: [object] } });
+    const p = f.speech('Scout, hello');
+    await f.turn([{ type: 'speech', player: p }]);
+    assert.equal(f.calls.filter(call => call.name === 'scape_move_to').length, 1);
+  });
+}
+
 test('sleep leaves the session, polls without inference, restores appearance and stops on voluntary leave', async () => {
   let time = 0,
     sessions = 0,
@@ -523,7 +620,7 @@ test('decision model can suppress unrelated speech or act before conversation ge
     f.observe();
     const p = f.speech('Would you come stand near me?');
     await f.turn([{ type: 'speech', player: p }]);
-    assert.equal(replies, action === 'reply' ? 1 : 0, action);
+    assert.equal(replies, ['reply', 'approach'].includes(action) ? 1 : 0, action);
     if (['approach', 'follow'].includes(action))
       assert.ok(f.calls.some(c => c.name === `scape_${action}` && c.args.player === p.id));
     if (action === 'give_space')
@@ -586,7 +683,7 @@ test('decision interaction uses adjacent objects and creates arrival goals for d
     });
     const p = f.speech('Please play that piano');
     await f.turn([{ type: 'speech', player: p }]);
-    assert.equal(replies, 0);
+    assert.equal(replies, x === 2 ? 1 : 0);
     assert.equal(
       f.calls.some(c => c.name === 'scape_interact'),
       x === 2,
@@ -706,4 +803,187 @@ test('disabled decision client restores the base path without calling inference 
   const p = f.speech('Hi Scout');
   await f.turn([{ type: 'speech', player: p }]);
   assert.equal(turns, 1);
+});
+
+test('FR-159: world behavior continues during decision cooldown and resumes decisions on fresh speech', async () => {
+  let clock = 0,
+    requests = 0,
+    conversations = 0;
+  const client = await createDecisionClient({
+    config: { type: 'openrouter' },
+    apiKey: 'FIXTURE_KEY',
+    now: () => clock,
+    fetchImpl: async (_url, options) => {
+      if (++requests === 1) return new Response(null, { status: 503 });
+      const input = JSON.parse(options.body);
+      return Response.json({
+        answers: Object.fromEntries(
+          Object.entries(input.questions).map(([id, q]) => [
+            id,
+            {
+              type: 'choice',
+              choice: id.endsWith('_action') ? 'ignore' : Object.keys(q.criteria)[0],
+            },
+          ]),
+        ),
+      });
+    },
+  });
+  const f = fixture({
+    decision: client,
+    policy: {
+      async onTurn() {
+        conversations++;
+      },
+    },
+  });
+  f.observe();
+  for (const text of ['Hi Scout', 'Are you there Scout?']) {
+    const p = f.speech(text);
+    await f.turn([{ type: 'speech', player: p }]);
+  }
+  assert.equal(conversations, 2);
+  assert.equal(requests, 1);
+  clock += 1000;
+  const p = f.speech('Never mind Scout');
+  await f.turn([{ type: 'speech', player: p }]);
+  assert.equal(requests, 2);
+  assert.equal(conversations, 2);
+  await client.close();
+});
+
+test('compound action requests reach the planner even when the decision model selects only the first action', async () => {
+  const outcomes = [];
+  const f = fixture({
+    decision: decisionFixture('interact', { object: 'o0' }),
+    policy: {
+      async onTurn(turn, context) {
+        const outcome = turn.events.find(event => event.type === 'task_result');
+        if (outcome) {
+          outcomes.push(outcome);
+          return;
+        }
+        await context.tools.call('agent_task', {
+          steps: [
+            { action: 'use', target: 'piano' },
+            { action: 'express', target: 'happy' },
+          ],
+        });
+      },
+    },
+  });
+  f.observe({
+    scene: { blocked: [], objects: [{ id: 'piano', x: 2, y: 1, floor: 0, emoji: '🎹' }] },
+  });
+  await f.turn([{ type: 'speech', player: f.speech('Scout, play the piano then smile') }]);
+  assert.ok(!f.calls.some(call => call.name === 'scape_interact'));
+  await f.turn();
+  assert.equal(f.calls.filter(call => call.name === 'scape_interact').length, 1);
+  await f.turn();
+  assert.equal(outcomes.length, 1);
+  assert.equal(outcomes[0].status, 'complete');
+  assert.ok(
+    f.calls.some(call => call.name === 'scape_expression' && call.args.expression === 'happy'),
+  );
+});
+
+test('owner cancellation and player stop prevent queued actions from executing', async () => {
+  for (const stop of ['owner', 'player']) {
+    const f = fixture({
+      policy: {
+        async onTurn(_, context) {
+          await context.tools.call('agent_task', {
+            steps: [{ action: 'express', target: 'happy' }],
+          });
+        },
+      },
+    });
+    await f.turn([{ type: 'speech', player: f.speech('Scout, smile') }]);
+    if (stop === 'owner') await f.agent.cancelTask();
+    else {
+      f.speech('Scout, stop');
+      await new Promise(setImmediate);
+    }
+    await f.turn();
+    assert.ok(
+      !f.calls.some(call => call.name === 'scape_expression' && call.args.expression === 'happy'),
+    );
+    assert.ok(f.calls.some(call => call.name === 'scape_stop'));
+  }
+});
+
+test('notes require explicit requests and the current visitor gets only their own saved context', async () => {
+  const saved = [],
+    forgotten = [],
+    turns = [];
+  const memory = createBehaviorMemory({
+    notes: {
+      async remember(key, text) {
+        saved.push({ key, text });
+      },
+      async forget(key) {
+        forgotten.push(key);
+      },
+      list(key) {
+        return saved.filter(note => note.key === key).map(note => note.text);
+      },
+    },
+  });
+  const f = fixture({
+    memory,
+    policy: {
+      async onTurn(turn) {
+        turns.push(turn);
+      },
+    },
+  });
+  await f.turn([{ type: 'speech', player: f.speech('Scout, I like music') }]);
+  assert.equal(saved.length, 0);
+  await f.turn([{ type: 'speech', player: f.speech('Scout, remember that I like music') }]);
+  assert.deepEqual(saved, [{ key: 'stable', text: 'I like music' }]);
+  assert.equal(turns.at(-1).events.find(e => e.type === 'memory_result').status, 'saved');
+  assert.deepEqual(turns.at(-1).events.at(-1).savedNotes, ['I like music']);
+  await f.turn([{ type: 'speech', player: f.speech('Scout, forget my notes') }]);
+  assert.deepEqual(forgotten, ['stable']);
+});
+
+test('confirmed task outcomes survive a temporary conversation failure without replaying actions', async () => {
+  let attempts = 0;
+  const f = fixture({
+    decision: decisionFixture('interact', { object: 'o0' }),
+    policy: {
+      async onTurn(turn) {
+        assert.equal(turn.events.find(event => event.type === 'task_result').status, 'complete');
+        if (++attempts === 1)
+          throw Object.assign(new Error('Temporary failure'), { code: 'provider_unavailable' });
+      },
+    },
+  });
+  f.observe({
+    scene: { blocked: [], objects: [{ id: 'a'.repeat(64), x: 2, y: 1, floor: 0, emoji: '🎹' }] },
+  });
+  await assert.rejects(f.turn([{ type: 'speech', player: f.speech('Scout, play the piano') }]), {
+    code: 'provider_unavailable',
+  });
+  await f.turn();
+  assert.equal(attempts, 2);
+  assert.equal(f.calls.filter(call => call.name === 'scape_interact').length, 1);
+});
+
+test('BUG-179: perceived conversation is marked read-only while expression requests retain actions', async () => {
+  for (const action of ['reply', 'express']) {
+    let social;
+    const f = fixture({
+      decision: decisionFixture(action),
+      policy: {
+        async onTurn(turn) {
+          social = turn.events.find(event => event.type === 'social');
+        },
+      },
+    });
+    f.observe();
+    const p = f.speech(action === 'reply' ? 'Scout, what are you doing?' : 'Scout, look happy');
+    await f.turn([{ type: 'speech', player: p }]);
+    assert.equal(social.conversationOnly, action === 'reply');
+  }
 });

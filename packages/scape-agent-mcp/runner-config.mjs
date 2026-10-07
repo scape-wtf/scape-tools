@@ -54,8 +54,15 @@ const schema = z
       .optional(),
     policy: z.string().min(1).optional(),
     decision: decisionSchema.optional(),
+    logging: z
+      .object({
+        level: z.enum(['standard', 'debug']).default('standard'),
+        traceReplies: z.boolean().default(false),
+      })
+      .strict()
+      .prefault({}),
     memory: z
-      .object({ enabled: z.boolean().default(true) })
+      .object({ enabled: z.boolean().default(true), conversationNotes: z.boolean().default(false) })
       .strict()
       .prefault({}),
     behavior: z

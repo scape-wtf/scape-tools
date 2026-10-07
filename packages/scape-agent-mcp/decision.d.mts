@@ -37,8 +37,10 @@ export type DecisionAdapterFactory = (options: {
   apiKey?: string;
 }) => DecisionAdapter | Promise<DecisionAdapter>;
 export interface DecisionClient {
+  /** False during cooldown, an unsettled timed-out call, suspension, or after close. */
   readonly available: boolean;
-  /** Serial calls only. Null means basic-behavior fallback after failure or exhausted budget. */
+  /** Serial calls only. Null means fallback; fresh evaluations resume after transient cooldown.
+   * Rejected identical input is skipped. Every provider attempt consumes the request budget. */
   evaluate(
     request: DecisionRequest,
     options?: { signal?: AbortSignal },
@@ -52,6 +54,8 @@ export function createDecisionClient(options: {
   fetchImpl?: typeof fetch;
   onStatus?: (message: string) => void;
   onState?: (state: string) => void;
+  /** Content-free metadata; intended for owner-side diagnostics. */
+  onDiagnostic?: (event: string, fields: Record<string, unknown>) => void;
   now?: () => number;
 }): Promise<DecisionClient>;
 export function validateDecisionAnswers(

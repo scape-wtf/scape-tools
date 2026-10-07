@@ -18,7 +18,9 @@
     "terminal.mjs",
     "provider-setup.mjs",
     "decision-setup.mjs",
-    "memory.mjs"
+    "memory.mjs",
+    "dashboard.mjs",
+    "agent-application.mjs"
   ],
   "bin": {
     "scape": "./cli.mjs"

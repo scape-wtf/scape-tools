@@ -257,7 +257,7 @@ test('HTTP failures, Cloudflare error envelopes and incomplete structured output
       },
     });
     assert.equal(await client.evaluate({ state: {}, questions }), null);
-    assert.equal(client.available, false);
+    assert.equal(client.available, type === 'openai-compatible');
     assert.equal(await client.evaluate({ state: {}, questions }), null);
     assert.equal(calls, 1);
     assert.doesNotMatch(messages.join(''), /SECRET/);
@@ -281,4 +281,298 @@ test('pacing remains cancellable without spending another request and concurrent
   await assert.rejects(pending, { name: 'AbortError' });
   assert.equal(calls, 1);
   assert.equal(client.available, true);
+});
+
+test('BUG-173: decision fallback reports safe HTTP, timeout and answer-validation diagnostics once', async () => {
+  for (const [fetchImpl, expected] of [
+    [
+      async () => new Response('PRIVATE_BODY', { status: 400 }),
+      /provider_http_error.*HTTP 400.*request format/i,
+    ],
+    [
+      async () => new Response('PRIVATE_BODY', { status: 403 }),
+      /provider_http_error.*HTTP 403.*access/i,
+    ],
+    [
+      async () => new Response('PRIVATE_BODY', { status: 429 }),
+      /provider_http_error.*HTTP 429.*rate|quota/i,
+    ],
+    [async () => Response.json({ answers: {} }), /invalid_answers/i],
+    [async () => new Response('PRIVATE_JSON'), /invalid_json/i],
+    [
+      async () => {
+        throw new TypeError('PRIVATE_NETWORK', { cause: { code: 'ECONNRESET' } });
+      },
+      /connection_reset/i,
+    ],
+    [() => new Promise(() => {}), /request_timeout.*250ms/i],
+  ]) {
+    let calls = 0;
+    const messages = [];
+    const client = await createDecisionClient({
+      config: { type: 'openrouter', timeoutMs: 250 },
+      apiKey: 'PRIVATE_KEY',
+      fetchImpl: (...args) => {
+        calls++;
+        return fetchImpl(...args);
+      },
+      onStatus: message => messages.push(message),
+    });
+    const keeper = setTimeout(() => {}, 1000);
+    try {
+      assert.equal(await client.evaluate({ state: {}, questions }), null);
+      assert.equal(await client.evaluate({ state: {}, questions }), null);
+      assert.equal(calls, 1);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], expected);
+      assert.match(messages[0], /^\d{4}-\d{2}-\d{2}T.*Decision model unavailable/);
+      assert.doesNotMatch(messages[0], /PRIVATE_|Bearer|https?:\/\//);
+    } finally {
+      clearTimeout(keeper);
+      await client.close();
+    }
+  }
+});
+
+test('FR-159: transient decision failures recover with fresh input, capped backoff and Retry-After', async () => {
+  let clock = Date.now(),
+    calls = 0;
+  const messages = [],
+    sent = [];
+  const client = await createDecisionClient({
+    config: compatible,
+    now: () => clock,
+    onStatus: message => messages.push(message),
+    fetchImpl: async (_url, options) => {
+      sent.push(JSON.parse(options.body).state);
+      calls++;
+      if (calls === 1) return new Response(null, { status: 429, headers: { 'Retry-After': '45' } });
+      if (calls < 9) return new Response(null, { status: 503 });
+      return Response.json({ answers });
+    },
+  });
+  assert.equal(await client.evaluate({ state: { version: 1 }, questions }), null);
+  assert.equal(client.available, false);
+  clock += 44000;
+  assert.equal(await client.evaluate({ state: { version: 2 }, questions }), null);
+  assert.equal(calls, 1);
+  clock += 1001;
+  assert.equal(client.available, true);
+  for (const milliseconds of [2000, 4000, 8000, 16000, 30000, 30000, 30000]) {
+    assert.equal(await client.evaluate({ state: { version: calls + 1 }, questions }), null);
+    assert.match(messages.at(-1), new RegExp(`after ${milliseconds / 1000}s`));
+    clock += milliseconds;
+  }
+  assert.deepEqual(await client.evaluate({ state: { version: 99 }, questions }), answers);
+  assert.deepEqual(sent.at(-1), { version: 99 });
+  assert.match(messages.at(-1), /restored/i);
+  await client.close();
+});
+
+test('FR-159: bad requests and invalid answers skip identical input but allow a fresh evaluation', async () => {
+  for (const failure of [400, 422, 'invalid']) {
+    let clock = 0,
+      calls = 0;
+    const client = await createDecisionClient({
+      config: compatible,
+      now: () => clock,
+      fetchImpl: async () =>
+        ++calls === 1
+          ? failure === 'invalid'
+            ? Response.json({ answers: {} })
+            : new Response(null, { status: failure })
+          : Response.json({ answers }),
+    });
+    assert.equal(await client.evaluate({ state: { version: 1 }, questions }), null);
+    clock += 1000;
+    assert.equal(client.available, true);
+    assert.equal(await client.evaluate({ state: { version: 1 }, questions }), null);
+    assert.equal(calls, 1);
+    assert.deepEqual(await client.evaluate({ state: { version: 2 }, questions }), answers);
+    clock += 1000;
+    assert.equal(await client.evaluate({ state: { version: 1 }, questions }), null);
+    assert.equal(calls, 2);
+    await client.close();
+  }
+});
+
+test('FR-159: credentials, credits and exhausted retry budget suspend decision calls', async () => {
+  for (const status of [401, 402, 403, 503]) {
+    let clock = 0,
+      calls = 0;
+    const messages = [];
+    const client = await createDecisionClient({
+      config: { ...compatible, maxRequests: 2 },
+      now: () => clock,
+      onStatus: message => messages.push(message),
+      fetchImpl: async () => {
+        calls++;
+        return new Response('PRIVATE', { status });
+      },
+    });
+    await client.evaluate({ state: {}, questions });
+    clock += 31000;
+    await client.evaluate({ state: { fresh: true }, questions });
+    clock += 31000;
+    assert.equal(await client.evaluate({ state: {}, questions }), null);
+    assert.equal(calls, status === 503 ? 2 : 1);
+    assert.equal(client.available, false);
+    assert.match(messages.at(-1), status === 503 ? /limit reached/ : /restart/i);
+    await client.close();
+  }
+});
+
+test('FR-159: close aborts active decisions and cooldown never starts a background request', async () => {
+  let receivedSignal,
+    calls = 0;
+  const client = await createDecisionClient({
+    config: compatible,
+    fetchImpl: (_url, { signal }) => {
+      calls++;
+      receivedSignal = signal;
+      return new Promise((_, reject) =>
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+      );
+    },
+  });
+  const pending = client.evaluate({ state: {}, questions });
+  const rejected = assert.rejects(pending, { name: 'AbortError' });
+  await delay(0);
+  await client.close();
+  await rejected;
+  assert.equal(receivedSignal.aborted, true);
+  assert.equal(client.available, false);
+  await assert.rejects(client.evaluate({ state: {}, questions }), { name: 'AbortError' });
+  assert.equal(calls, 1);
+});
+
+test('FR-159: timed-out adapters cannot overlap a retry or publish a late result', async () => {
+  let clock = 0,
+    calls = 0,
+    finish;
+  const client = await createDecisionClient({
+    config: { ...compatible, timeoutMs: 250 },
+    now: () => clock,
+    fetchImpl: () => {
+      calls++;
+      return calls === 1
+        ? new Promise(resolve => {
+            finish = resolve;
+          })
+        : Promise.resolve(Response.json({ answers }));
+    },
+  });
+  const keeper = setTimeout(() => {}, 1000);
+  try {
+    assert.equal(await client.evaluate({ state: {}, questions }), null);
+    clock += 2000;
+    assert.equal(client.available, false);
+    assert.equal(await client.evaluate({ state: { fresh: true }, questions }), null);
+    assert.equal(calls, 1);
+    finish(Response.json({ answers }));
+    await delay(0);
+    assert.equal(client.available, true);
+    assert.deepEqual(await client.evaluate({ state: { fresh: true }, questions }), answers);
+    assert.equal(calls, 2);
+  } finally {
+    clearTimeout(keeper);
+    await client.close();
+  }
+});
+
+test('FR-159: network and timeout recovery reset backoff after success; cancelled turns never retry', async () => {
+  for (const timeout of [false, true]) {
+    let clock = 0,
+      calls = 0;
+    const messages = [];
+    const client = await createDecisionClient({
+      config: { ...compatible, timeoutMs: 250 },
+      now: () => clock,
+      onStatus: message => messages.push(message),
+      fetchImpl: async (_url, { signal }) => {
+        calls++;
+        if (calls === 1 && timeout)
+          return new Promise((_, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+          );
+        if (calls === 1 || calls === 3)
+          throw new TypeError('PRIVATE', { cause: { code: 'ECONNRESET' } });
+        return Response.json({ answers });
+      },
+    });
+    const keeper = setTimeout(() => {}, 1000);
+    try {
+      assert.equal(await client.evaluate({ state: {}, questions }), null);
+      const cancelled = new AbortController();
+      cancelled.abort();
+      await assert.rejects(
+        client.evaluate({ state: {}, questions }, { signal: cancelled.signal }),
+        { name: 'AbortError' },
+      );
+      assert.equal(calls, 1);
+      clock += 1000;
+      assert.deepEqual(await client.evaluate({ state: {}, questions }), answers);
+      clock += 1000;
+      assert.equal(await client.evaluate({ state: {}, questions }), null);
+      assert.match(messages.at(-1), /after 1s/);
+    } finally {
+      clearTimeout(keeper);
+      await client.close();
+    }
+  }
+});
+
+test('FR-160: decision diagnostics report request failure, cooldown and recovery without state', async () => {
+  let clock = 0,
+    calls = 0;
+  const events = [];
+  const client = await createDecisionClient({
+    config: compatible,
+    now: () => clock,
+    onDiagnostic: (event, fields) => events.push({ event, ...fields }),
+    fetchImpl: async () =>
+      ++calls === 1 ? new Response('PRIVATE_ERROR', { status: 503 }) : Response.json({ answers }),
+  });
+  const request = { state: { text: 'PRIVATE_STATE' }, questions };
+  assert.equal(await client.evaluate(request), null);
+  assert.equal(await client.evaluate(request), null);
+  clock = 1000;
+  assert.deepEqual(await client.evaluate(request), answers);
+  assert.ok(
+    events.some(
+      e => e.phase === 'failed' && e.status === 503 && e.retryMs === 1000 && e.recovery === 'retry',
+    ),
+  );
+  assert.ok(events.some(e => e.event === 'decision_skip' && e.reason === 'cooldown'));
+  assert.ok(events.some(e => e.phase === 'complete' && e.request === 2));
+  assert.doesNotMatch(JSON.stringify(events), /PRIVATE_ERROR|PRIVATE_STATE/);
+  await client.close();
+});
+
+test('BUG-179: production reply questions pass the real decision client validation boundary', async () => {
+  const { reviewQuestions } = await import('./reply-review.mjs');
+  let requested = false;
+  const client = await createDecisionClient({
+    config: { type: 'openrouter' },
+    apiKey: 'fixture',
+    fetchImpl: async () => {
+      requested = true;
+      return Response.json({
+        answers: {
+          grounding: { type: 'choice', choice: 'supported' },
+          relevance: { type: 'choice', choice: 'relevant' },
+        },
+      });
+    },
+  });
+  try {
+    const result = await client.evaluate({
+      state: { draft: 'Hello!' },
+      questions: reviewQuestions,
+    });
+    assert.equal(requested, true);
+    assert.equal(result.grounding.choice, 'supported');
+  } finally {
+    await client.close();
+  }
 });

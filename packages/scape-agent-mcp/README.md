@@ -30,12 +30,13 @@ To switch destinations, stop the runner and use `scape agent login`; approval
 replaces the previous grant. A public world becoming private ends access unless
 you own it. Agents remain ordinary participants without editor or moderator roles.
 
-The CLI's conversation budget defaults to 200 provider requests per process.
+The CLI's conversation budget defaults to 200 provider requests per run.
 Enter `0` in guided setup or set `limits.maxModelCalls` to `0` for unlimited
 requests. Failed requests and private reply checks count toward a finite budget,
 and sleeping or reconnecting does not reset it. Per-turn limits and provider
-charges still apply. The optional decision model has its own budget and falls
-back to basic behavior if it fails or exhausts that budget. See
+charges still apply. The optional decision model has its own budget. Temporary failures back off while
+basic behavior continues; rejected input is skipped, while credentials/credits or
+budget exhaustion suspend decisions. Recovery attempts count toward its budget. See
 [agent configuration](https://developer.scape.wtf/agents/configuration).
 
 ## Shared continuous runtime
@@ -308,3 +309,66 @@ published package with `npm install @scape-wtf/agent-mcp` or use
 
 Protocol references: [official MCP server guide](https://modelcontextprotocol.io/docs/develop/build-server)
 and [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
+
+### Diagnostic logs
+
+Run `scape agent configure`, select **Diagnostic logs → Detailed**, save and restart the agent. `scape agent status` shows the selected mode. Explicit projects can set `"logging": { "level": "debug" }` in `scape.agent.json`; the default is `standard`. Detailed terminal output includes request timing/counts, safe errors, decision recovery and social choices, tool outcomes, reply-review verdicts/probabilities, correction attempts and fallback reasons. Credentials, messages, drafts, prompts and raw provider/tool responses are excluded. Terminal diagnostics create no files or extra model calls. Optional Private reply traces (`logging.traceReplies: true`, default false) save drafts, dialogue, review context and verdicts to an owner-only `.scape-traces/replies.jsonl` file, capped at 1 MiB. Known credentials are redacted; review content before sharing, disable after debugging and delete the file while stopped to clear it. Traces are never uploaded automatically. Custom policies own their internal diagnostics. See [configuration](https://developer.scape.wtf/agents/configuration#diagnostic-logs).
+
+Reply review uses the current message as its target and treats character tone separately from relevance. A relevance rejection or uncertain grounding verdict gets one independent conversation-provider check; it counts against the conversation budget. Unsupported claims require correction when the decision reports supported probability at most 0.25, or provides no probability. Other negative grounding verdicts receive an independent check; they are not automatically accepted. Semantic rejections receive one reason-specific rewrite; unavailable/malformed reviewers use a temporary-error reply instead of asking the visitor to clarify.
+
+Review history retains at most two prior targets and confirmed tool results, bounded
+to 4,000 serialized characters per turn and respecting `limits.historyTurns`. It excludes
+old world snapshots, rejected drafts and private completions; omissions are explicit.
+Recognized input-token failures report `context_limit`; detailed decision requests include
+`inputBytes`. After successful speech, subsequent tool offerings omit `scape_speak` for
+that turn. Any duplicate attempt is skipped with `reply_already_published` and an instruction
+to finish; requested non-speech actions can still complete.
+
+Rejected drafts are corrected in a fresh, speech-only request using the current
+target, observed activity and confirmed actions. The replacement still passes review;
+the repair stage cannot act in the world to make an unsupported claim true. Corrected
+turns remember confirmed outcomes rather than rejected drafts. Detailed logs mark
+the generation request as `purpose=reply_correction` and malformed repair as
+`invalid_correction`. Normal request, timeout and tool-round limits apply.
+
+Clarification turns offer speech only. Runtime guard failures provide fixed guidance
+for clarification, quiet/space, paused movement and speech still being read. Detailed
+tool logs include an allowlisted `toolName` and reason without raw error text.
+
+Named piano requests retain note labels during decision making and approach that exact key, including keys that also carry conveyor arrows. An interaction with a musical conveyor can continue along its path; activating a key does not guarantee a one-note-only ride. Reply checks receive recent acknowledged behavior actions as well as current movement and interaction state. Current activity is explicitly classified as idle, moving, interacting or unknown; an old arrival record is not ongoing movement. Object identity is captured when an action starts, so moving out of observation range does not erase which key or object was used.
+
+If a direct reply or greeting ends without a speech call or any confirmed tool action, the runner allows one fresh speech-only recovery within the same turn limits. The replacement must pass reply review; private assistant prose is never automatically published. Detailed logs identify this as `reason=missing_speech`. Natural requests to resume remain eligible for decision review after combined wait and quiet controls.
+
+## Local owner controls, plans and conversation notes
+
+The CLI now opens a terminal dashboard by default on interactive terminals. See
+[CLI dashboard and tasks](../scape-cli/README.md#terminal-dashboard-and-tasks).
+There is no owner dashboard in the game UI.
+
+`runAgent` accepts `onEvent(event)` for local identity/world, task, memory and
+allowlisted diagnostic events, and `onControls(controls)` for `cancelTask()`,
+`refreshMemory()` and `forgetMemory(noteId)`. The controls callback receives
+`undefined` at shutdown. Events exclude credentials and model drafts; memory
+events contain explicitly saved player notes, so treat them as private local data.
+Request diagnostics are emitted even when text logging is standard.
+
+Shared behavior offers `agent_task` to the conversation model: up to eight
+ordered `visit`, `use`, `approach` or `express` steps with observed target IDs.
+Tasks wait for actual arrival/tool outcomes, support cancellation and do not
+survive reconnection. Task results enter normal reply review before an
+acknowledgement is published. `createWorldBehavior` also exposes `cancelTask()`
+and accepts `onEvent`; `createBehaviorMemory` accepts a `notes` scope.
+
+Optional `memory.conversationNotes: true` enables explicitly requested local notes.
+The `@scape-wtf/agent-mcp/notes` export provides `openConversationNotes({ directory,
+readOnly?, now? })`, returning `list()`, `forget(id)`, `scope({ origin, room, agent })`
+and `close()`. A scope provides `list(visitorKey)`, `remember(visitorKey, text)` and
+`forget(visitorKey)`. All writes are private and atomic. Limits: 500 characters per
+note, 20 per visitor/scope, 256 total, 30 days. This is separate from encounter
+metadata; never pass model-invented facts to `remember` as player consent.
+
+Current object availability is supplied separately from general tool capabilities.
+The policy distinguishes supported future intentions from completed actions and cannot
+propose breaking/editing objects as a real mechanic. A reviewed correction ends its turn;
+it does not resume the rejected action plan. Task outcomes retain the original request
+alongside the executed steps so omitted steps cannot be presented as completed.

@@ -1,8 +1,10 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { createHash } from 'node:crypto';
+import { recoveryDelay } from './recovery.mjs';
 import { z } from 'zod';
 import { decisionSchema, normalizeDecision } from './decision-config.mjs';
 import { validateEndpoint } from './runner-config.mjs';
-import { providerJSON } from './provider-http.mjs';
+import { providerJSON, providerFailure, providerFailureMessage } from './provider-http.mjs';
 import { loadOwnerModule } from './policy-loader.mjs';
 
 const choice = z
@@ -168,7 +170,7 @@ function httpAdapter(config, apiKey, fetchImpl) {
         body: JSON.stringify(body),
       });
       if (config.type === 'cloudflare') {
-        if (payload.success === false) throw new Error('Decision provider rejected the request.');
+        if (payload.success === false) throw providerFailure('provider_error');
         return payload.result ?? payload;
       }
       if (config.type === 'openai-compatible') {
@@ -178,8 +180,14 @@ function httpAdapter(config, apiKey, fetchImpl) {
           reply.message?.role !== 'assistant' ||
           typeof reply.message.content !== 'string'
         )
-          throw new Error('Incomplete structured decision response.');
-        return JSON.parse(reply.message.content);
+          throw providerFailure(
+            reply?.finish_reason === 'length' ? 'output_limit' : 'response_incomplete',
+          );
+        try {
+          return JSON.parse(reply.message.content);
+        } catch {
+          throw providerFailure('invalid_json');
+        }
       }
       return payload;
     },
@@ -194,12 +202,18 @@ export async function createDecisionClient({
   fetchImpl = fetch,
   onStatus = () => {},
   onState = () => {},
+  onDiagnostic = () => {},
   now = Date.now,
 }) {
   const parsed = decisionSchema.safeParse(raw);
   if (!parsed.success)
     throw new Error('Invalid decision configuration. Check the decision model guide.');
   const config = normalizeDecision(parsed.data, validateEndpoint);
+  const diagnostic = (event, fields) => {
+    try {
+      onDiagnostic(event, fields);
+    } catch {}
+  };
   if (config.apiKeyEnv && !apiKey)
     throw new Error(
       `Set ${config.apiKeyEnv} or configure the decision provider key before running.`,
@@ -216,23 +230,46 @@ export async function createDecisionClient({
       );
     }
   } else adapter = httpAdapter(config, apiKey, fetchImpl);
+  const shutdown = new AbortController();
+  // At most maxRequests hashes; never retain rejected world text or reply drafts.
+  const rejectedInputs = new Set();
+  let pendingAdapter;
+  let retryAt = 0,
+    failures = 0,
+    recovering = false;
   let calls = 0,
     next = 0,
     unavailable = false,
     active = false;
   return {
     get available() {
-      return !unavailable;
+      return !unavailable && !shutdown.signal.aborted && !pendingAdapter && now() >= retryAt;
     },
     async evaluate(request, { signal } = {}) {
-      signal?.throwIfAborted();
-      if (unavailable) return null;
-      if (calls >= config.maxRequests) {
-        unavailable = true;
-        onStatus('Decision request limit reached · using basic world behavior for this run.');
+      signal = signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal;
+      signal.throwIfAborted();
+      if (unavailable) {
+        diagnostic('decision_skip', { reason: 'suspended' });
         return null;
       }
       if (active) throw new Error('Decision evaluations must be serialized.');
+      if (pendingAdapter || now() < retryAt) {
+        diagnostic('decision_skip', {
+          reason: pendingAdapter ? 'pending_request' : 'cooldown',
+          retryMs: Math.max(0, retryAt - now()),
+        });
+        return null;
+      }
+      if (calls >= config.maxRequests) {
+        unavailable = true;
+        diagnostic('decision_skip', {
+          reason: 'budget_exhausted',
+          calls,
+          limit: config.maxRequests,
+        });
+        onStatus('Decision request limit reached · using basic world behavior for this run.');
+        return null;
+      }
       const checked = questionsSchema.safeParse(request.questions);
       if (
         !checked.success ||
@@ -246,8 +283,15 @@ export async function createDecisionClient({
       )
         throw new Error('Invalid typed decision questions.');
       const input = { state: request.state, questions: checked.data };
-      if (JSON.stringify(input).length > 128000)
-        throw new Error('Decision state exceeds the size limit.');
+      const serialized = JSON.stringify(input);
+      if (serialized.length > 128000) throw new Error('Decision state exceeds the size limit.');
+      const fingerprint = createHash('sha256').update(serialized).digest('hex');
+      if (rejectedInputs.has(fingerprint)) {
+        diagnostic('decision_skip', { reason: 'rejected_input' });
+        return null;
+      }
+      const purpose = input.state?.kind === 'private_reply_check' ? 'reply_review' : 'decision';
+      let started;
       active = true;
       try {
         onState('thinking');
@@ -255,6 +299,15 @@ export async function createDecisionClient({
         signal?.throwIfAborted();
         next = now() + config.minIntervalMs;
         calls++;
+        started = now();
+        diagnostic('decision_request', {
+          phase: 'start',
+          request: calls,
+          purpose,
+          calls,
+          limit: config.maxRequests,
+          inputBytes: Buffer.byteLength(serialized),
+        });
         const bounded = signal
           ? AbortSignal.any([signal, AbortSignal.timeout(config.timeoutMs)])
           : AbortSignal.timeout(config.timeoutMs);
@@ -266,26 +319,98 @@ export async function createDecisionClient({
             bounded.addEventListener('abort', listener, { once: true });
             if (bounded.aborted) listener();
           });
-          const result = await Promise.race([
-            Promise.resolve().then(() =>
-              adapter.evaluate(structuredClone(input), { signal: bounded }),
-            ),
-            aborted,
-          ]);
+          const operation = Promise.resolve().then(() => {
+            bounded.throwIfAborted();
+            return adapter.evaluate(structuredClone(input), { signal: bounded });
+          });
+          pendingAdapter = operation;
+          const settled = () => {
+            if (pendingAdapter === operation) pendingAdapter = undefined;
+          };
+          operation.then(settled, settled);
+          const result = await Promise.race([operation, aborted]);
           bounded.throwIfAborted();
-          return validateDecisionAnswers(input.questions, result?.answers);
+          try {
+            const answers = validateDecisionAnswers(input.questions, result?.answers);
+            failures = 0;
+            retryAt = 0;
+            if (recovering)
+              onStatus('Decision model restored · using decision-guided world behavior.');
+            recovering = false;
+            diagnostic('decision_request', {
+              phase: 'complete',
+              request: calls,
+              purpose,
+              durationMs: Math.max(0, now() - started),
+            });
+            return answers;
+          } catch {
+            throw providerFailure('invalid_answers');
+          }
         } finally {
           bounded.removeEventListener('abort', listener);
         }
       } catch (error) {
         if (signal?.aborted) {
+          diagnostic('decision_request', { phase: 'cancelled', request: calls, purpose });
           signal.throwIfAborted();
         }
-        // No silent paid retries, credential-bearing bodies or arbitrary adapter errors.
-        unavailable = true;
+        const status = error?.status;
+        const suspend = [401, 402, 403].includes(status);
+        const transient =
+          error?.name === 'TimeoutError' ||
+          [
+            'request_timeout',
+            'network_error',
+            'connection_reset',
+            'connection_refused',
+            'dns_failure',
+            'network_unreachable',
+            'socket_closed',
+            'tls_failure',
+            'unreadable_response',
+          ].includes(error?.reason) ||
+          status === 408 ||
+          status === 429 ||
+          (status >= 500 && status <= 599) ||
+          (!status && (!error?.reason || error.reason === 'provider_error'));
+        const budgetExhausted = calls >= config.maxRequests;
+        unavailable = suspend || budgetExhausted;
+        let retryMs;
+        if (!unavailable) {
+          recovering = true;
+          if (transient) {
+            const retryAfter =
+              Number.isSafeInteger(error?.retryAfterMs) && error.retryAfterMs > 0
+                ? error.retryAfterMs
+                : 0;
+            retryMs = Math.max(recoveryDelay(failures++), retryAfter);
+            retryAt = now() + retryMs;
+          } else {
+            failures = 0;
+            rejectedInputs.add(fingerprint);
+          }
+        }
         onStatus(
-          'Decision model unavailable · using basic world behavior for this run. Check its endpoint, credentials and output format before restarting.',
+          providerFailureMessage(error, 'decision', config.timeoutMs, new Date(), {
+            budgetExhausted,
+            retryMs,
+            skip: !unavailable && !transient,
+          }),
         );
+        diagnostic('decision_request', {
+          phase: 'failed',
+          request: calls,
+          purpose,
+          durationMs: started === undefined ? 0 : Math.max(0, now() - started),
+          reason:
+            error?.name === 'TimeoutError'
+              ? 'request_timeout'
+              : providerFailure(error?.reason).reason,
+          status,
+          retryMs,
+          recovery: unavailable ? 'suspend' : transient ? 'retry' : 'skip',
+        });
         return null;
       } finally {
         active = false;
@@ -293,6 +418,8 @@ export async function createDecisionClient({
       }
     },
     async close() {
+      if (shutdown.signal.aborted) return;
+      shutdown.abort();
       try {
         await adapter.close?.();
       } catch {

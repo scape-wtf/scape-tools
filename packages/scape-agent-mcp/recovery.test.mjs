@@ -316,3 +316,93 @@ test(
     assert.equal(calls, 3);
   },
 );
+
+test('BUG-173: conversation retries distinguish HTTP, network, output and timeout failures without secrets', async () => {
+  const cases = [
+    [
+      async () => new Response('PRIVATE_BODY', { status: 401 }),
+      /provider_http_error.*HTTP 401.*credentials/i,
+    ],
+    [
+      async () => new Response('PRIVATE_BODY', { status: 429 }),
+      /provider_http_error.*HTTP 429.*rate|quota/i,
+    ],
+    [
+      async () => new Response('PRIVATE_BODY', { status: 503 }),
+      /provider_http_error.*HTTP 503.*unavailable/i,
+    ],
+    [
+      async () => {
+        throw new TypeError('PRIVATE_URL', { cause: { code: 'ENOTFOUND' } });
+      },
+      /dns_failure.*hostname/i,
+    ],
+    [async () => new Response('PRIVATE_INVALID_JSON'), /invalid_json/i],
+    [
+      async () =>
+        Response.json({
+          choices: [
+            { finish_reason: 'length', message: { role: 'assistant', content: 'PRIVATE_OUTPUT' } },
+          ],
+        }),
+      /output_limit.*maxOutputTokens/i,
+    ],
+    [
+      async () =>
+        Response.json({
+          choices: [{ finish_reason: 'content_filter', message: { role: 'assistant' } }],
+        }),
+      /response_incomplete/i,
+    ],
+    [
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(new Error('PRIVATE_STREAM'));
+            },
+          }),
+        ),
+      /unreadable_response/i,
+    ],
+    [
+      async (_url, { signal }) =>
+        new Promise((_, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+        ),
+      /turn_timeout.*1000ms/i,
+    ],
+  ];
+  for (const [fetchImpl, expected] of cases) {
+    const messages = [];
+    const policy = createModelPolicy({
+      config: parseAgentConfig({
+        name: 'Fixture',
+        provider: { type: 'openrouter', model: 'fixture' },
+        limits: { turnTimeoutMs: 1000 },
+      }),
+      toolDefinitions: [],
+      apiKey: 'PRIVATE_KEY',
+      fetchImpl,
+      onStatus: message => messages.push(message),
+    });
+    const context = {
+      signal: new AbortController().signal,
+      observation: { players: [{ id: 'visitor' }] },
+      tools: { call: async () => ({}) },
+    };
+    // Keep the test alive for AbortSignal.timeout's unref'd timer.
+    const keepAlive = setTimeout(() => {}, 2000);
+    try {
+      await assert.rejects(policy.onTurn({ events: [] }, context), {
+        code: 'provider_unavailable',
+      });
+    } finally {
+      clearTimeout(keepAlive);
+    }
+    assert.equal(messages.length, 1);
+    assert.match(messages[0], expected);
+    assert.match(messages[0], /^\d{4}-\d{2}-\d{2}T.*Conversation provider unavailable/);
+    assert.doesNotMatch(messages[0], /PRIVATE_|Bearer|https?:\/\//);
+  }
+});

@@ -47,6 +47,10 @@
     "./memory": {
       "types": "./encounters.d.mts",
       "import": "./encounters.mjs"
+    },
+    "./notes": {
+      "types": "./notes.d.mts",
+      "import": "./notes.mjs"
     }
   },
   "bin": {
@@ -74,6 +78,9 @@
     "transport.md",
     "providers.mjs",
     "provider-http.mjs",
+    "runtime-logging.mjs",
+    "reply-review.mjs",
+    "reply-trace.mjs",
     "world-behavior.mjs",
     "presence.mjs",
     "runner.d.mts",
@@ -85,7 +92,10 @@
     "social-decisions.mjs",
     "world-goals.mjs",
     "encounters.mjs",
-    "encounters.d.mts"
+    "encounters.d.mts",
+    "tasks.mjs",
+    "notes.mjs",
+    "notes.d.mts"
   ],
   "engines": {
     "node": ">=22"

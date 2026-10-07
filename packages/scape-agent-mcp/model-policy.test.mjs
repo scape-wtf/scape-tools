@@ -174,6 +174,10 @@ test('BUG-154: real MCP tool schemas work with providers that reject Unicode reg
           );
         }
         const speak = body.tools.find(t => (t.function?.name ?? t.name) === 'scape_speak');
+        if (requests > 1) {
+          assert.equal(speak, undefined, 'published speech is no longer offered this turn');
+          return response(reply(type, null));
+        }
         const schema = speak.function?.parameters ?? speak.parameters ?? speak.input_schema;
         assert.equal(
           schema.properties.text.maxLength,
@@ -373,6 +377,15 @@ test('BUG-156: tool-round exhaustion ends the decision, retains results and list
         assert.equal(body.messages.filter(m => m.role === 'tool').length, 2);
         return response(reply('openrouter'));
       }
+      if (requests === 4) {
+        assert.deepEqual(
+          body.tools.map(tool => tool.function.name),
+          ['scape_speak'],
+        );
+        return response(
+          reply('openrouter', { name: 'scape_speak', args: { text: 'Hello again.' } }),
+        );
+      }
       return response(reply('openrouter', { name: 'scape_guide', args: {} }));
     },
   });
@@ -382,7 +395,7 @@ test('BUG-156: tool-round exhaustion ends the decision, retains results and list
   assert.equal(states.at(-1), 'listening');
   assert.match(messages.at(-1), /tool rounds.*listening/i);
   await policy.onTurn({ events: [{ type: 'speech', player: { id: 'visitor', text: 'Next' } }] }, c);
-  assert.equal(requests, 3);
+  assert.equal(requests, 4);
   assert.equal(stops, 0);
 });
 
@@ -511,3 +524,55 @@ test('re-entering a world cannot reset the process model-call budget', async () 
   );
   assert.equal(calls, 1);
 });
+
+for (const type of ['openrouter', 'openai', 'anthropic'])
+  test(`accepted plans wait for outcomes and keep valid ${type} provider history`, async () => {
+    const requests = [],
+      calls = [];
+    const cfg = config(type);
+    cfg.behavior.checkReplies = false;
+    const policy = createPolicy({
+      config: cfg,
+      toolDefinitions: [...definitions, { name: 'agent_task', inputSchema: { type: 'object' } }],
+      fetchImpl: async (_, options) => {
+        const body = JSON.parse(options.body);
+        requests.push(body);
+        if (requests.length === 1)
+          return response(
+            reply(type, {
+              name: 'agent_task',
+              args: { steps: [{ action: 'approach', target: 'visitor' }] },
+            }),
+          );
+        // Early plan acceptance must not leave an unmatched provider tool call.
+        const history = body.messages ?? body.input;
+        assert.ok(
+          !history.some(
+            message =>
+              message.tool_calls?.length ||
+              message.type === 'function_call' ||
+              message.content?.some?.(block => block.type === 'tool_use'),
+          ),
+        );
+        return response(reply(type));
+      },
+    });
+    const ctx = context();
+    ctx.tools.call = async (tool, args) => {
+      calls.push(tool);
+      return { accepted: true, status: 'queued' };
+    };
+    await policy.onTurn(
+      {
+        events: [
+          { type: 'speech', player: ctx.observation.players[0] },
+          { type: 'social', taskPlanning: true },
+        ],
+      },
+      ctx,
+    );
+    assert.equal(requests.length, 1);
+    assert.deepEqual(calls, ['agent_task']);
+    await policy.onTurn({ events: [{ type: 'idle' }] }, ctx);
+    assert.equal(requests.length, 2);
+  });

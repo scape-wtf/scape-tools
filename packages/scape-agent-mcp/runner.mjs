@@ -1,3 +1,5 @@
+import { taskTool } from './tasks.mjs';
+import { openConversationNotes } from './notes.mjs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +20,8 @@ import {
 import { loadAgentPolicy } from './policy-loader.mjs';
 import { openEncounterMemory } from './encounters.mjs';
 import { createDecisionClient } from './decision.mjs';
+import { createRuntimeLogger } from './runtime-logging.mjs';
+import { openReplyTrace } from './reply-trace.mjs';
 import { recoverConnection, connectionRetryMessage } from './recovery.mjs';
 export {
   providerPresets,
@@ -39,6 +43,8 @@ export async function runAgent({
   assetDirectory,
   memoryDirectory,
   onState = () => {},
+  onEvent = () => {},
+  onControls = () => {},
 }) {
   const base = path.resolve(directory);
   const gameOrigin = validateEndpoint(origin, true);
@@ -58,6 +64,25 @@ export async function runAgent({
       );
     }
   const config = parseAgentConfig(raw);
+  const emit = event => {
+    try {
+      onEvent(event);
+    } catch {
+      // Presentation must never interrupt world participation.
+    }
+  };
+  emit({ type: 'session' });
+  const diagnostic = createRuntimeLogger(config.logging, log, emit);
+  emit({
+    type: 'identity',
+    name: config.name,
+    conversation: config.provider?.model,
+    decision: config.decision?.model,
+    conversationLimit: config.limits.maxModelCalls,
+    decisionLimit: config.decision?.maxRequests,
+    origin: gameOrigin,
+  });
+  diagnostic('runtime', { phase: 'start' });
   let policyFactory, apiKey;
   if (config.policy) {
     policyFactory = await loadAgentPolicy(base, config.policy);
@@ -78,9 +103,21 @@ export async function runAgent({
   if (signal?.aborted) stop();
   for (const name of ['SIGINT', 'SIGTERM']) process.once(name, stop);
   const client = new Client({ name: 'scape-persistent-agent', version: '0.1.0' });
-  let decision, encounterStore;
+  let decision, encounterStore, replyTrace, noteStore, currentAgent;
   try {
     shutdown.signal.throwIfAborted();
+    if (config.logging.traceReplies)
+      replyTrace = await openReplyTrace({
+        directory: base,
+        secrets: [
+          apiKey,
+          suppliedKey,
+          decisionApiKey,
+          token,
+          config.decision?.apiKeyEnv ? process.env[config.decision.apiKeyEnv] : undefined,
+        ],
+        log,
+      });
     if (config.decision)
       decision = await createDecisionClient({
         config: config.decision,
@@ -90,6 +127,7 @@ export async function runAgent({
           (config.decision.apiKeyEnv ? process.env[config.decision.apiKeyEnv] : undefined),
         onStatus: log,
         onState,
+        onDiagnostic: diagnostic,
       });
     onState('connecting');
     await client.connect(
@@ -127,12 +165,34 @@ export async function runAgent({
           onError: log,
         });
     }
+    if (shared && config.memory.conversationNotes) {
+      try {
+        noteStore = await openConversationNotes({
+          directory: memoryDirectory ?? path.join(base, '.scape-memory'),
+        });
+        emit({ type: 'memory', notes: noteStore.list() });
+      } catch {
+        log(
+          'Conversation notes unavailable · continuing without saved notes. Check private local storage permissions.',
+        );
+      }
+    }
+    const refreshMemory = () => emit({ type: 'memory', notes: noteStore?.list() ?? [] });
+    onControls({
+      cancelTask: () => currentAgent?.cancelTask?.(),
+      refreshMemory,
+      async forgetMemory(id) {
+        await noteStore?.forget(id);
+        refreshMemory();
+      },
+    });
     const memoryFor = room => {
       if (!memories.has(room))
         memories.set(
           room,
           createBehaviorMemory({
             encounters: encounterStore?.scope({ origin: gameOrigin, room, agent: config.name }),
+            notes: noteStore?.scope({ origin: gameOrigin, room, agent: config.name }),
           }),
         );
       return memories.get(room);
@@ -141,23 +201,28 @@ export async function runAgent({
       if (policyFactory) return policyFactory(context);
       const policy = createModelPolicy({
         config,
-        toolDefinitions: shared ? [...toolDefinitions, behaviorTool] : toolDefinitions,
+        toolDefinitions: shared ? [...toolDefinitions, behaviorTool, taskTool] : toolDefinitions,
         apiKey,
         decision,
         onStatus: log,
         onState,
         budget,
+        onEvent: emit,
+        onReplyTrace: record => replyTrace?.write(record),
         instructions: shared ? behaviorInstructions : '',
       });
-      return shared
+      currentAgent = shared
         ? createWorldBehavior({
             config,
             context,
             policy,
             memory: memoryFor(context.observation.room),
             decision,
+            onDiagnostic: diagnostic,
+            onEvent: event => (event.type === 'memory_changed' ? refreshMemory() : emit(event)),
           })
         : policy;
+      return currentAgent;
     };
     await recoverConnection({
       signal: shutdown.signal,
@@ -173,6 +238,7 @@ export async function runAgent({
           if (!entry.entered) await delay(1500, undefined, { signal: shutdown.signal });
         } while (!entry.entered);
         await tools.call('scape_set_avatar', config.avatar, { signal: shutdown.signal });
+        emit({ type: 'world', room: entry.observation.room });
         onState('listening');
         log(`${config.name} is running. Ctrl+C leaves the world.`);
         return entry.observation;
@@ -210,10 +276,20 @@ export async function runAgent({
       try {
         await decision?.close();
       } finally {
-        await encounterStore?.close();
+        try {
+          await encounterStore?.close();
+        } finally {
+          try {
+            await replyTrace?.close();
+          } finally {
+            await noteStore?.close();
+          }
+        }
       }
     }
+    onControls(undefined);
     onState('stopped');
+    diagnostic('runtime', { phase: 'stopped' });
   }
 }
 

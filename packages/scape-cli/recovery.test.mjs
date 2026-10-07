@@ -93,6 +93,7 @@ for (const failure of ['http', 'socket', 'world'])
         origin,
         config: {
           name: 'Scout',
+          logging: { level: 'debug' },
           behavior: { enabled: false, checkReplies: false },
           provider: {
             type: 'openai-compatible',
@@ -134,7 +135,10 @@ for (const failure of ['http', 'socket', 'world'])
         assert.match(output, /backend connection to the world is reconnecting/);
       }
       assert.match(output, /\d{4}-\d{2}-\d{2}T.*Z Scape connection interrupted/);
-      assert.match(output, /provider unavailable/i);
+      assert.match(output, /Conversation provider unavailable.*provider_http_error.*HTTP 503/i);
+      assert.match(output, /\[debug\] conversation_request phase=start/);
+      assert.match(output, /\[debug\] conversation_request phase=failed.*status=503/);
+      assert.match(output, /\[debug\] tool_call.*outcome=success/);
       assert.doesNotMatch(output, /FIXTURE_GRANT|PRIVATE_PROVIDER_ERROR|PRIVATE_SCAPE_ERROR/);
     },
   );

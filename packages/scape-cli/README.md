@@ -78,7 +78,7 @@ values. Keys never enter MCP/tool results or logs. Grants stay bound to the host
 and identity. Stop the process before configuring or pairing again.
 
 The shared terminal renderer uses Scape's semantic yellow/cyan/green palette and
-a six-position world-grid loader. `NO_COLOR=1` makes output plain;
+a six-position world-grid loader for guided prompts. `NO_COLOR=1` disables color without disabling the dashboard; use `--no-tui` for scrolling output;
 `SCAPE_REDUCED_MOTION=1` keeps color without animation. Piped output stays plain;
 MCP config/serve retain clean protocol output.
 
@@ -109,11 +109,13 @@ decision model is already configured. Keep the suggested model, edit it, choose
 the key just configured; you can also enter a separate decision key. Environment
 credentials remain environment references and are not copied into the profile.
 Other conversation providers default to no decision model. Running an existing
-profile does not change its configuration. Decision failure or request-budget
-exhaustion disables that stage for the run while basic behavior continues;
+profile does not change its configuration. Decision timeouts/network failures and HTTP 429/5xx back off with fresh-state recovery
+while basic behavior continues. Rejected input is skipped; access/credit errors or
+request-budget exhaustion suspend that stage until restart. Every recovery attempt
+counts toward the decision budget;
 conversation-provider failures retry with exponential backoff while observations continue. See [decision setup](https://developer.scape.wtf/agents/decision-models).
-Normal provider charges apply. The default 200-request limit resets per process
-and is not a currency cap. Set `limits.maxModelCalls` to `0`, or enter `0` in guided setup, for unlimited conversation requests. Failed attempts and private reply checks count toward a finite budget. History stays in memory.
+Normal provider charges apply. The default 200-request limit resets per run
+and is not a currency cap. Stopping and starting from the dashboard creates a new run; sleep and connection recovery keep the same request counts. Set `limits.maxModelCalls` to `0`, or enter `0` in guided setup, for unlimited conversation requests. Failed attempts and private reply checks count toward a finite budget. History stays in memory.
 
 New approved grants have no time expiry. Pairing codes still expire after five minutes; existing finite grants require one new pairing to remove their deadline. Revocation, the approving account session ending, bans, and lost world access still stop the process. Observation outages and ended presence sessions reconnect with a fresh observation and policy, using exponential delays from one to thirty seconds. No dispatched world action is automatically replayed. Ctrl+C cancels recovery. Scape still does not install a background service. Trusted custom policies can
 replace the built-in model policy. See the [quickstart](https://developer.scape.wtf/agents/quickstart)
@@ -224,3 +226,83 @@ installation; this is not a fully offline kit. No game source or credentials are
 An installed kit supports both command families without a source checkout.
 `yarn scape gizmo init /path/to/another-project` carries all three archives into a new
 blank project. Initial kit export still requires repository access; public projects should use the registry packages described above.
+
+### Diagnostic logs
+
+Run `scape agent configure`, select **Diagnostic logs → Detailed**, save and restart the agent. `scape agent status` shows the selected mode. Explicit projects can set `"logging": { "level": "debug" }` in `scape.agent.json`; the default is `standard`. Detailed terminal output includes request timing/counts, safe errors, decision recovery and social choices, tool outcomes, reply-review verdicts/probabilities, correction attempts and fallback reasons. Credentials, messages, drafts, prompts and raw provider/tool responses are excluded. Terminal diagnostics create no files or extra model calls. Optional Private reply traces (`logging.traceReplies: true`, default false) save drafts, dialogue, review context and verdicts to an owner-only `.scape-traces/replies.jsonl` file, capped at 1 MiB. Known credentials are redacted; review content before sharing, disable after debugging and delete the file while stopped to clear it. Traces are never uploaded automatically. Custom policies own their internal diagnostics. See [configuration](https://developer.scape.wtf/agents/configuration#diagnostic-logs).
+
+Reply review uses the current message as its target and treats character tone separately from relevance. A relevance rejection or uncertain grounding verdict can receive one independent conversation-provider check; it counts against the conversation budget. Confident unsupported claims require correction. Semantic rejections receive one reason-specific rewrite; unavailable/malformed reviewers use a temporary-error reply instead of asking the visitor to clarify.
+
+Reviews use bounded prior dialogue and confirmed actions rather than repeated world
+snapshots or private drafts. Recognized input-token failures report `context_limit`,
+and detailed decision requests include `inputBytes`. Once a reply is published,
+speech is removed from subsequent tool offerings for that turn. Duplicate attempts
+are skipped with `reply_already_published`; other requested actions can still finish.
+
+A rejected reply gets one fresh, speech-only correction from the current question
+and observed evidence. It must pass review before publication, and cannot perform
+actions to make an invented claim true. Detailed logs identify this request with
+`purpose=reply_correction`; malformed repair reports `invalid_correction`.
+A successfully reviewed correction ends the turn without resuming the rejected action plan. Clarification turns offer speech only. Detailed tool logs include a known `toolName`
+and fixed reasons for clarification, quiet/space, paused movement or speech still
+being read; those guards give the model actionable guidance without raw errors.
+
+## Terminal dashboard and tasks
+
+Run `scape` after installing `@scape-wtf/cli` to open the terminal application.
+`scape agent run --origin https://scape.wtf` starts the agent and opens its dashboard
+in an interactive terminal. Use `--no-tui` for scrolling output; redirected output
+and noninteractive processes use plain output automatically. Initial setup still
+requires a terminal or an explicitly configured project.
+
+The dashboard has four tabs: **Overview**, **Tasks**, **Memory**, and **Logs**.
+Press **1–4** or **Tab** to switch; **↑/↓** scroll. Overview offers **s** to start,
+**x** to stop, **c** to configure and **p** to pair with a world. Stop before changing
+configuration. **k** cancels the current task; **q** or **Ctrl+C** leaves the world
+and exits. A stopped agent can be started again from the dashboard. This is a
+local owner interface; no owner panel is added to the world UI. Project mode uses
+its `scape.agent.json` for configuration.
+
+Tasks contain up to eight ordered visit, use, approach or expression steps.
+Movement acceptance is not completion: the runner waits for observed arrival,
+and an interaction must succeed before the next step runs. A failed step cancels
+remaining steps and sends the confirmed outcome to the conversation model for a
+brief acknowledgement. New requests from the same player, stop/quiet requests,
+owner cancellation and departure cancel the plan. Plans are session-local and
+are not replayed after reconnecting. The model must select the plan tool correctly;
+arbitrary tours and lessons are not built-in routines.
+
+Overview shows model request counts and provider health independently of the
+configured log level. Logs retain the latest 300 entries in memory. They exclude
+API keys, conversation drafts and raw provider responses. The existing optional
+private reply trace remains separate from dashboard logs.
+
+## Optional conversation notes
+
+`memory.conversationNotes` defaults to `false`. Enable **Conversation notes** in
+Configure to accept explicit requests such as “Scout, remember that I like music”.
+Ordinary conversation is not automatically saved. Notes are player-authored context,
+not instructions or verified world facts. The agent can use a visitor's notes only
+in that visitor's world and agent scope, with the same Scape origin.
+
+Storage is local and owner-only, under `.scape-notes/notes.json` in the managed
+profile (`~/.scape`) or project memory directory (`.scape-memory`). Limits are
+500 characters per note, 20 notes per visitor/scope, 256 notes overall, and 30-day
+retention. Stable visitor identity is required. macOS, Linux and WSL support private
+persistence; unavailable storage leaves the agent running without notes.
+
+In Memory, use **↑/↓** to select a note, **Enter** to inspect its full text and **f**, then **y**, to forget it; **r**
+refreshes. A player can say “Scout, forget my notes” to remove their notes in the
+current scope. Command equivalents are:
+
+```sh
+scape agent memory notes list
+scape agent memory notes forget <note-id>
+scape agent memory notes clear
+scape agent memory notes enable
+scape agent memory notes disable
+```
+
+Command mutations require the managed agent to be stopped; dashboard controls work
+with its active store. Disabling notes preserves existing records until forgotten
+or expired. Encounter metadata remains a separate setting and contains no dialogue.

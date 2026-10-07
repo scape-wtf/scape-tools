@@ -1,3 +1,4 @@
+import { openConversationNotes } from '@scape-wtf/agent-mcp/notes';
 import { openEncounterMemory } from '@scape-wtf/agent-mcp/memory';
 import { parseAgentConfig } from '@scape-wtf/agent-mcp/runner';
 import { profileDirectory, readProfile, saveProfile, lockProfile } from './profile.mjs';
@@ -6,6 +7,8 @@ export async function memoryCommand(
   args,
   { directory = profileDirectory(), ui = terminal() } = {},
 ) {
+  const notes = args[0] === 'notes';
+  if (notes) args = args.slice(1);
   const [action = 'list', id] = args;
   if (
     !['list', 'forget', 'clear', 'enable', 'disable'].includes(action) ||
@@ -15,7 +18,7 @@ export async function memoryCommand(
     throw new Error('Use scape agent memory list, forget <visitor-id>, clear, enable or disable.');
   let release, store;
   try {
-    ui.heading('Encounter memory');
+    ui.heading(notes ? 'Conversation notes' : 'Encounter memory');
     if (action !== 'list') release = await lockProfile(directory);
     const profile = await readProfile(directory);
     if (!profile) {
@@ -25,14 +28,35 @@ export async function memoryCommand(
     if (['enable', 'disable'].includes(action)) {
       const config = parseAgentConfig({
         ...profile.config,
-        memory: { enabled: action === 'enable' },
+        memory: {
+          ...profile.config.memory,
+          [notes ? 'conversationNotes' : 'enabled']: action === 'enable',
+        },
       });
       await saveProfile(directory, { ...profile, config });
+      if (notes) {
+        ui.success(
+          `Conversation notes ${action === 'enable' ? 'enabled' : 'disabled'} for the next run. Existing notes remain until forgotten or expired.`,
+        );
+        return;
+      }
       ui.success(
         action === 'enable'
           ? 'Encounter memory enabled for the next run.'
           : 'Encounter memory disabled. Existing records remain; use scape agent memory clear to remove them.',
       );
+      return;
+    }
+    if (notes) {
+      store = await openConversationNotes({ directory, readOnly: action === 'list' });
+      if (action === 'list') {
+        for (const note of store.list()) {
+          ui.line(`${note.id} · ${note.room}`);
+          ui.line(note.text);
+        }
+        if (!store.list().length) ui.line('No saved conversation notes.');
+      } else if (action === 'forget') await store.forget(id);
+      else for (const note of store.list()) await store.forget(note.id);
       return;
     }
     store = await openEncounterMemory({ directory, readOnly: action === 'list' });

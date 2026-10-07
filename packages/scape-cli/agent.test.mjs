@@ -370,11 +370,15 @@ test(
                     ? body.state.speakers[0].text.includes('closer')
                       ? 'approach'
                       : 'reply'
-                    : key.endsWith('_tone')
-                      ? 'neutral'
-                      : key === 'mood'
-                        ? 'warm'
-                        : 'stay',
+                    : key === 'grounding'
+                      ? 'supported'
+                      : key === 'relevance'
+                        ? 'relevant'
+                        : key.endsWith('_tone')
+                          ? 'neutral'
+                          : key === 'mood'
+                            ? 'warm'
+                            : 'stay',
                 },
               ]),
             ),
@@ -383,7 +387,27 @@ test(
           conversations++;
           assert.equal(req.headers.authorization, 'Bearer CHAT_SECRET');
           result = {
-            choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: 'Done' } }],
+            choices: [
+              conversations === 1
+                ? {
+                    finish_reason: 'tool_calls',
+                    message: {
+                      role: 'assistant',
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: 'reply',
+                          type: 'function',
+                          function: {
+                            name: 'scape_speak',
+                            arguments: JSON.stringify({ text: 'Hello.' }),
+                          },
+                        },
+                      ],
+                    },
+                  }
+                : { finish_reason: 'stop', message: { role: 'assistant', content: 'Done' } },
+            ],
           };
         } else {
           assert.equal(req.headers.authorization, 'Bearer GRANT_SECRET');
@@ -471,8 +495,9 @@ test(
       textRevision: 3,
     };
     observation.revision++;
-    await until(() => conversations === 1);
-    assert.equal(decisions, 2);
+    await until(() => observation.self.text === 'Hello.');
+    assert.ok(conversations >= 1);
+    assert.equal(decisions, 3);
     child.kill('SIGINT');
     assert.deepEqual(await exit, { code: 0, signal: null });
     assert.ok(leaves >= 1);

@@ -23,7 +23,9 @@ export interface AgentConfig {
   provider?: { type: string; model: string; baseUrl: string; apiKeyEnv: string | null };
   policy?: string;
   decision?: DecisionConfig;
-  memory: { enabled: boolean };
+  /** Debug adds content-free runtime diagnostics to the existing log callback. */
+  logging: { level: 'standard' | 'debug'; traceReplies: boolean };
+  memory: { enabled: boolean; conversationNotes: boolean };
   behavior: AgentBehaviorSettings;
   limits: {
     turnTimeoutMs: number;
@@ -57,6 +59,17 @@ export function runAgent(options: {
   assetDirectory?: string;
   memoryDirectory?: string;
   onState?: (state: string) => void;
+  /** Local dashboard events; never includes credentials or private model drafts. */
+  onEvent?: (event: { type: string; [key: string]: unknown }) => void;
+  onControls?: (
+    controls:
+      | {
+          cancelTask(): void | Promise<void>;
+          refreshMemory(): void;
+          forgetMemory(id: string): Promise<void>;
+        }
+      | undefined,
+  ) => void;
 }): Promise<void>;
 export function checkAgentAccess(options: {
   origin: string;

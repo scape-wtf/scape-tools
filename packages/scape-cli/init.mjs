@@ -27,7 +27,9 @@ export async function initProject(destination) {
   await mkdir(output);
   const template = fileURLToPath(new URL('./templates/blank/', import.meta.url));
   for (const name of await readdir(template)) {
-    await cp(path.join(template, name), path.join(output, name), { recursive: true });
+    // npm excludes .gitignore from packages; restore its name in the generated project.
+    const outputName = name === 'gitignore' ? '.gitignore' : name;
+    await cp(path.join(template, name), path.join(output, outputName), { recursive: true });
   }
   const manifestPath = path.join(output, 'package.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));

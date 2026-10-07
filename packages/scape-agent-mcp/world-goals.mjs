@@ -41,7 +41,7 @@ export function objectDestination(state, object, canStand = () => true) {
   blocked.delete(origin);
   // A conveyor can be boarded at a reachable segment in its connected chain.
   const targets = [object];
-  if (conveyor(object))
+  if (conveyor(object) && object.emoji !== '🎹')
     for (let i = 0; i < targets.length; i++)
       for (const next of objects)
         if (

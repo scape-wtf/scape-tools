@@ -478,3 +478,62 @@ test('late or superseded arrival cannot activate an old object goal', async () =
     assert.ok(!f.calls.some(c => c.name === 'scape_interact'), outcome);
   }
 });
+
+test('BUG-177: interaction evidence keeps note identity after leaving observation range', async () => {
+  const client = decision('interact');
+  const turns = [];
+  const f = fixture({
+    client,
+    policy: {
+      async onTurn(turn) {
+        turns.push(turn);
+      },
+    },
+  });
+  f.observe({ scene: { blocked: [], objects: [{ ...piano, x: 2, y: 1, pianoNote: 'B4' }] } });
+  await f.turn([f.speech('Nova, play B4')]);
+  assert.ok(f.calls.some(call => call.name === 'scape_interact'));
+  client.evaluate = decision('reply').evaluate;
+  f.observe({ scene: { blocked: [], objects: [] } });
+  await f.turn([f.speech('Did you play B4?', { ...alice, textRevision: 2 })]);
+  const actions = turns.at(-1).events.find(event => event.type === 'social').recentActions;
+  assert.equal(
+    actions.find(action => action.tool === 'scape_interact').targetObject?.pianoNote,
+    'B4',
+  );
+});
+
+test('BUG-177: a natural resume is evaluated after combined wait and quiet controls', async () => {
+  let action = 'resume';
+  const heard = [];
+  const f = fixture({
+    client: { evaluate: request => decision(action).evaluate(request) },
+    policy: {
+      async onTurn(turn) {
+        heard.push(turn.events.find(event => event.type === 'speech').player.text);
+      },
+    },
+  });
+  await f.turn([f.speech('Nova, stay here')]);
+  await f.turn([f.speech('Nova, stop talking', { ...alice, textRevision: 2 })]);
+  await f.turn([f.speech('You can talk again now', { ...alice, textRevision: 3 })]);
+  action = 'reply';
+  await f.turn([f.speech('How are you?', { ...alice, textRevision: 4 })]);
+  assert.deepEqual(heard, ['How are you?']);
+});
+
+test('BUG-177: explicit permission to talk again can include a follow-up question', async () => {
+  const heard = [];
+  const f = fixture({
+    client: decision('reply'),
+    policy: {
+      async onTurn(turn) {
+        heard.push(turn.events.find(event => event.type === 'speech').player.text);
+      },
+    },
+  });
+  await f.turn([f.speech('Nova, stay here')]);
+  await f.turn([f.speech('Nova, stop talking', { ...alice, textRevision: 2 })]);
+  await f.turn([f.speech('Nova, you can talk again. How are you?', { ...alice, textRevision: 3 })]);
+  assert.deepEqual(heard, ['Nova, you can talk again. How are you?']);
+});
