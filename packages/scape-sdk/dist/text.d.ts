@@ -7,6 +7,6 @@ export interface GizmoTextEditor {
     maxLength: number;
 }
 export declare function validGizmoTextEditor(value: unknown): value is GizmoTextEditor;
-/** Plain, bounded text only: hosts must never interpret this as HTML. */
+/** Validate bounded plain text; Scape displays it without interpreting HTML. */
 export declare function validGizmoWorldText(value: unknown): value is string;
 export declare function gizmoWorldText(definition: ObjectDefinition, state: unknown): string;

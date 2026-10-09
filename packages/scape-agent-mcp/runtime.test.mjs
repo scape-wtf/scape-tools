@@ -472,3 +472,33 @@ test('interrupting a decision preserves presence, serializes its replacement and
     await running;
   }
 });
+
+test('editing denials keep presence alive while revoked access still stops it', async () => {
+  for (const code of ['edit_forbidden', 'editing_not_granted', 'access_revoked']) {
+    const f = fixture();
+    const call = f.tools.call;
+    f.tools.call = async (name, args, options) => {
+      if (name === 'scape_remove_object')
+        throw Object.assign(new Error(code), { code, status: 403 });
+      return call(name, args, options);
+    };
+    let after;
+    const running = runAgentSession({
+      tools: f.tools,
+      initialObservation: state(),
+      createAgent: () => ({
+        async onTurn(_, context) {
+          await assert.rejects(
+            context.tools.call('scape_remove_object', { target: 'a'.repeat(64) }),
+            { code },
+          );
+          after = context.signal.aborted;
+          context.stop();
+        },
+      }),
+    });
+    if (code === 'access_revoked') await assert.rejects(running, { code });
+    else await running;
+    assert.equal(after, code === 'access_revoked');
+  }
+});

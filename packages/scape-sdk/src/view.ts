@@ -1,3 +1,4 @@
+import { ACTION_ICONS, ACTION_BUTTON_PRESETS } from './actionButtons.js';
 import { exactKeys, jsonData, record, type ObjectField, type ObjectView } from './api.js';
 
 /** The same bounded view contract is used for bundled and uploaded definitions. */
@@ -80,6 +81,23 @@ export function validObjectView(value: unknown): value is ObjectView {
           (Array.isArray(control.fields) &&
             new Set(control.fields).size === control.fields.length &&
             control.fields.every(id => fields.some(field => field.id === id)))) &&
+        (control.button === undefined ||
+          (record(control.button) &&
+            ((exactKeys(control.button, ['preset']) &&
+              typeof control.button.preset === 'string' &&
+              Object.hasOwn(ACTION_BUTTON_PRESETS, control.button.preset)) ||
+              (exactKeys(control.button, ['icon']) &&
+                typeof control.button.icon === 'string' &&
+                (ACTION_ICONS as readonly string[]).includes(control.button.icon))) &&
+            typeof control.confirm === 'string' &&
+            control.confirm.trim().length > 0 &&
+            typeof control.label === 'string' &&
+            control.label.trim().length > 0 &&
+            control.icon === undefined &&
+            control.placement === undefined &&
+            control.trigger === undefined &&
+            control.kind === undefined &&
+            control.pressed === undefined)) &&
         (control.icon === undefined ||
           (control.icon === 'toggle' &&
             typeof control.pressed === 'boolean' &&

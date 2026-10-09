@@ -11,7 +11,9 @@ export async function main(argv = process.argv.slice(2)) {
   if (config) args.shift();
   const [origin, ...extra] = args;
   if (!origin || extra.length) {
-    console.error('Usage: node packages/scape-agent-mcp/cli.mjs [--config] [https://scape.wtf]');
+    console.error(
+      'Use scape agent mcp config to configure an MCP application, or scape agent mcp serve to start the server.',
+    );
     process.exitCode = 1;
   } else {
     const apps = new Set();
@@ -74,7 +76,7 @@ export async function main(argv = process.argv.slice(2)) {
       }
     } catch {
       console.error(
-        'Cannot start Scape MCP. Use an HTTPS origin or loopback HTTP, and install the adapter dependencies.',
+        'Cannot start Scape MCP. Check your CLI installation, then run scape agent mcp config to regenerate the connection settings.',
       );
       process.exitCode = 1;
       void close();

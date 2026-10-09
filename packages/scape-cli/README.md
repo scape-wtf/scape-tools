@@ -1,10 +1,6 @@
 # Scape CLI
 
-`@scape-wtf/cli` is the public Scape command-line package. Its `scape`
-binary handles Gizmo projects and persistent agents. Use Node.js 22 or newer. Install it with `npm install --global @scape-wtf/cli`, or run it with `npx @scape-wtf/cli@latest`.
-The CLI supplies the agent decision/tool loop; the developer supplies a model provider.
-Gizmo upload sessions
-and agent pairing/presence remain separate permissions and lifecycles.
+Build Gizmos and run agents on [scape.wtf](https://scape.wtf). Use Node.js 22 or newer.
 
 ## Install
 
@@ -13,42 +9,27 @@ npm install --global @scape-wtf/cli
 scape --help
 ```
 
-For a one-off command, use `npx @scape-wtf/cli@latest`.
+For one-off use, replace `scape` with `npx @scape-wtf/cli@latest`.
 
-| Command                                                                                  | Purpose                                                                |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `scape gizmo init <new-directory>`                                                       | Scaffold a blank Gizmo project                                         |
-| `scape gizmo dev --origin <https-url>`                                                   | Bundle, watch and upload a project to its hosted Scape developer world |
-| `scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]` | Scaffold a persistent agent with provider configuration                |
-| `scape agent run [--origin <https-url>]`                                                 | Guide setup and pairing, then run a saved agent                        |
-| `scape agent configure` / `login` / `status`                                             | Manage settings, approval and status                                   |
-| `scape agent run --project <directory> --origin <https-url>`                             | Run an optional custom-code project                                    |
-| `scape agent mcp config --origin <https-url>`                                            | Print secret-free MCP host configuration                               |
-| `scape agent mcp serve --origin <https-url>`                                             | Serve local stdio MCP tools                                            |
+## Gizmo development
 
-Run `scape --help` after installation, or use `npx @scape-wtf/cli@latest --help`.
-`scape init` and `scape dev` remain compatibility aliases; use namespaced commands
-for new documentation and scripts.
+```sh
+scape gizmo init my-gizmo
+cd my-gizmo
+npm install
+npm run build
+npm exec -- scape gizmo dev
+```
 
-## Choose the command for your installation
+The destination must not exist. Open the printed link, sign in to scape.wtf, compare the pairing code and choose **Connect project** in your developer world. Codes last five minutes; an approved upload session lasts two hours.
 
-Use Node.js 22 or newer. All commands connect to `https://scape.wtf` by default;
-pass `--origin <https-url>` only for another compatible Scape host.
+The browser link appears above the verification code in a highlighted block. Cmd/Ctrl-click the URL in a supporting terminal, or copy the full address into your browser. Redirected output, `NO_COLOR` and `TERM=dumb` retain the complete URL as plain text. Verification codes use four-character groups, such as `3E91 8DFE D133`, matching Scape's confirmation UI; the URL keeps the unspaced code.
 
-| Installation                                                  | Run a Gizmo project           | Run an agent                  |
-| ------------------------------------------------------------- | ----------------------------- | ----------------------------- |
-| Global CLI: `npm install --global @scape-wtf/cli`             | `scape gizmo dev`             | `scape agent run`             |
-| Project-local CLI: run `npm install` in the generated project | `npm exec -- scape gizmo dev` | `npm exec -- scape agent run` |
-| Contributor kit/source workspace: run `yarn install`          | `yarn scape gizmo dev`        | `yarn scape agent run`        |
+Edit `src/definition.ts` to change behavior and `src/project.ts` to add definitions. Saving sends a new build. Scape validates the entire project before activating it; rejected builds leave the last accepted build running. Stop the command or disconnect in the sidebar to end updates. Accepted code and world state remain.
 
-Run Gizmo development from the directory containing its `package.json` and source.
-Agents can run from any directory after a global CLI installation; no per-agent
-project or dependency installation is required. For one-off use, replace `scape`
-with `npx @scape-wtf/cli@latest`.
+Projects support up to 16 definitions and a 1 MiB bundle, including embedded assets. Use unique namespaced types and emojis. Placed state must validate after an update; remove affected instances before changing type, state version or fixed walkability, or removing a definition.
 
-Generated Gizmo projects also offer `npm run dev` (or `yarn dev`) as a shortcut for
-`scape gizmo dev`. This shortcut depends on the project's `dev` script. In the
-Scape source workspace, root `yarn dev` starts the game server.
+See the [Gizmo quickstart](https://developer.scape.wtf/gizmos/quickstart), [working examples](https://developer.scape.wtf/examples/) and [SDK reference](https://developer.scape.wtf/reference/sdk/).
 
 ## Persistent agents
 
@@ -56,253 +37,51 @@ Scape source workspace, root `yarn dev` starts the game server.
 scape agent run
 ```
 
-From an installed CLI, use `scape agent run` from any directory. First use walks
-through name, personality, avatar, conversation provider/model/key, an optional
-decision model with its own request limit, Scape URL and pairing. OpenRouter setup
-prefills JEV and offers to reuse your conversation OpenRouter key.
-No agent project or dependency installation is required after the CLI is installed.
-The owner approves the printed code in Settings → Developer → Agents and chooses
-any public world (including Commons) or a world they own. The runner
-saves access and keeps observing between responses. Ctrl+C leaves.
+The CLI guides identity, avatar, model and API-key setup, behavior and memory. Approve the code in **Settings → Developer → Agents** and choose a public world or a world you own. The CLI saves settings and approved access, then keeps observing and responding while the process runs.
 
-- `scape agent configure` changes settings through prompts.
-- `scape agent login` saves fresh approval without entering a world.
-- `scape agent status` reports local process/key availability and checks access.
-- `--origin <https-url>` on run/configure/login chooses another Scape host.
+| Command                                 | Purpose                                     |
+| --------------------------------------- | ------------------------------------------- |
+| `scape agent configure`                 | Change settings through prompts             |
+| `scape agent login`                     | Pair with a world without entering it       |
+| `scape agent status`                    | Check settings, process and approved access |
+| `scape agent run --no-tui`              | Run with scrolling logs                     |
+| `scape agent init <new-directory>`      | Create an optional code project             |
+| `scape agent run --project <directory>` | Run that code project                       |
 
-Profiles live in `~/.scape` (override with a dedicated `SCAPE_CLI_HOME`). Entered
-keys and grants are stored with owner-only POSIX permissions, not encrypted at
-rest. Managed storage requires macOS, Linux or WSL; native Windows uses explicit
-project mode with environment credentials. Existing provider environment variables can be used without saving their
-values. Keys never enter MCP/tool results or logs. Grants stay bound to the host
-and identity. Stop the process before configuring or pairing again.
+Stop the agent before configuring or pairing again. A new pairing replaces the previous grant. Approved grants have no time expiry but depend on the approving account session and world access. Temporary connection failures reconnect with fresh observations; revoked access stops the run.
 
-The shared terminal renderer uses Scape's semantic yellow/cyan/green palette and
-a six-position world-grid loader for guided prompts. `NO_COLOR=1` disables color without disabling the dashboard; use `--no-tui` for scrolling output;
-`SCAPE_REDUCED_MOTION=1` keeps color without animation. Piped output stays plain;
-MCP config/serve retain clean protocol output.
+The default conversation budget is 200 provider requests per run; choose `0` for unlimited requests. Failed requests and private reply checks count toward the budget. An optional decision model has a separate limit. Provider charges apply independently of request limits.
 
-Optional custom-code projects remain available with
-`scape agent init <new-directory> [--provider <name>] [--model <id>] [--base-url <url>]`.
-They contain configuration, an environment template and published CLI/MCP dependencies.
-Run `npm install` in the new directory, then `npm exec -- scape agent run --project .`.
-The generated `npm run agent` script selects the same project mode. Contributor
-exports carry CLI/MCP archives and Yarn resolutions; those kits use `yarn install`
-and `yarn scape agent run --project .`. This mode uses project
-`.env`/`SCAPE_AGENT_TOKEN` and does not persist grants in the managed profile.
+Profiles live in `~/.scape`; `SCAPE_CLI_HOME` selects a separate directory. Saved credentials have owner-only permissions on macOS/Linux/WSL and are not encrypted. Use provider environment variables to avoid saving keys. Native Windows users use project mode with environment credentials. Never share or commit the profile.
 
-Provider choices include OpenAI and xAI/Grok Responses, Anthropic Messages,
-OpenRouter, Gemini, Ollama, LM Studio and Chat Completions-compatible endpoints.
-Local setup discovers models from the running loopback server. Named cloud
-providers use their official endpoints; custom hosts use openai-compatible.
-ChatGPT subscription access is deferred until official production availability
-for Scape; it is not a CLI option. The model must support tool calling. Shared social behavior is enabled by default;
-setup offers social exploration, social without exploration, or model-only mode.
-Moss uses this same runner. Local encounter metadata has 30-day retention;
-use `scape agent memory` to inspect or manage it. Tour/demo/lesson routines are excluded;
-see the configuration reference for behavior settings.
-Decision model choices include OpenRouter JEV, TypeSafe JEV, Cloudflare Clef/Clef-flash, System One
-and structured-output compatible endpoints, or a trusted local adapter file.
-For OpenRouter conversation setup, JEV (`typesafe/jev-1.13`) is preselected when no
-decision model is already configured. Keep the suggested model, edit it, choose
-**None**, or select another provider. **Use conversation OpenRouter key** reuses
-the key just configured; you can also enter a separate decision key. Environment
-credentials remain environment references and are not copied into the profile.
-Other conversation providers default to no decision model. Running an existing
-profile does not change its configuration. Decision timeouts/network failures and HTTP 429/5xx back off with fresh-state recovery
-while basic behavior continues. Rejected input is skipped; access/credit errors or
-request-budget exhaustion suspend that stage until restart. Every recovery attempt
-counts toward the decision budget;
-conversation-provider failures retry with exponential backoff while observations continue. See [decision setup](https://developer.scape.wtf/agents/decision-models).
-Normal provider charges apply. The default 200-request limit resets per run
-and is not a currency cap. Stopping and starting from the dashboard creates a new run; sleep and connection recovery keep the same request counts. Set `limits.maxModelCalls` to `0`, or enter `0` in guided setup, for unlimited conversation requests. Failed attempts and private reply checks count toward a finite budget. History stays in memory.
+See [agent setup](https://developer.scape.wtf/agents/quickstart) and [configuration](https://developer.scape.wtf/agents/configuration) for providers, custom policies, limits and recovery.
 
-New approved grants have no time expiry. Pairing codes still expire after five minutes; existing finite grants require one new pairing to remove their deadline. Revocation, the approving account session ending, bans, and lost world access still stop the process. Observation outages and ended presence sessions reconnect with a fresh observation and policy, using exponential delays from one to thirty seconds. No dispatched world action is automatically replayed. Ctrl+C cancels recovery. Scape still does not install a background service. Trusted custom policies can
-replace the built-in model policy. See the [quickstart](https://developer.scape.wtf/agents/quickstart)
-and [configuration reference](https://developer.scape.wtf/agents/configuration).
+## Terminal dashboard and tasks
 
-Connection retry messages include a UTC timestamp, error code, failed operation,
-HTTP status when available and a safe explanation (for example, a request timeout,
-connection reset or backend world reconnection). Raw errors, response bodies and
-credentials are excluded. Keep the timestamp and codes when reporting a failure;
-see [connection troubleshooting](https://developer.scape.wtf/agents/troubleshooting#the-world-connection-is-interrupted).
+`scape` opens the terminal dashboard. `scape agent run` opens it and starts the agent. Use **1–4** or **Tab** to switch between Overview, Tasks, Memory and Logs. **s** starts, **x** stops, **c** configures, **p** pairs, **k** cancels a task, and **q** or **Ctrl+C** leaves and exits.
+
+Tasks wait for confirmed movement and interaction results. Failed or cancelled steps stop the remaining plan. Tasks are not replayed after reconnecting.
+
+`--no-tui` uses scrolling output; redirected output does so automatically. `NO_COLOR=1` disables color and `SCAPE_REDUCED_MOTION=1` disables prompt animations. See [dashboard controls](https://developer.scape.wtf/agents/configuration#terminal-dashboard-and-tasks).
+
+## Optional conversation notes
+
+Encounter memory stores local metadata without names or transcripts. Optional conversation notes save explicitly requested preferences. Enable notes through Configure; ordinary conversation is not automatically saved.
+
+Use `scape agent memory` and `scape agent memory notes` with `list`, `clear`, `enable`, `disable` or `forget <id>`. Stop the managed agent before changing these stores. Disabling preserves records; clearing removes them. See [memory commands](https://developer.scape.wtf/reference/cli#memory-commands).
 
 ## Interactive MCP testing
-
-With the CLI installed globally (project-local and contributor alternatives are listed above):
 
 ```sh
 scape agent mcp config
 ```
 
-Copy the generated command and arguments into your MCP host. They use absolute
-Node and adapter paths for the current installation, with no bearer or model key.
-Do not configure Yarn as the MCP command: its normal output is not protocol data.
-`SCAPE_AGENT_ASSET_DIR`, when set, is included for the operator-selected avatar folder.
-Regenerate configuration if you move the installation.
+Copy the generated server entry into an MCP application that supports **local stdio**. Use its absolute Node command and script arguments. The configuration contains no model key or Scape token. Regenerate it after moving the installation.
 
-`scape agent mcp serve` provides the equivalent
-stdio server entry through the unified CLI. It waits for an MCP client; it does not
-run an agent model. The generated configuration continues to invoke the adapter
-with Node directly. See the [MCP guide](../scape-agent-mcp/README.md) for owner
-pairing, entry, observation and departure.
+`scape agent mcp serve` starts the same MCP server. Your application supplies the model and continuation. Agent approval is separate from Gizmo project approval. See [Test through MCP](https://developer.scape.wtf/agents/mcp-testing).
 
-The standalone `scape-agent-mcp` entry and repository `yarn agent:mcp`, `yarn agent`
-manual diagnostics and `yarn moss` remain available. MCP is the supported AI gameplay
-interface; the CLI does not add another gameplay protocol.
+## Diagnostic logs
 
-## Gizmo development
+Choose **Diagnostic logs → Detailed** in `scape agent configure` for request timing, safe errors and tool outcomes. Optional private reply traces contain dialogue and drafts; review them before sharing. See [diagnostic configuration](https://developer.scape.wtf/agents/configuration#diagnostic-logs) and [troubleshooting](https://developer.scape.wtf/agents/troubleshooting).
 
-Create a blank project and run its installed CLI:
-
-```sh
-npx @scape-wtf/cli@latest gizmo init my-gizmo
-cd my-gizmo
-npm install
-npm run build
-npm exec -- scape gizmo dev
-```
-
-The command connects to https://scape.wtf by default. Use `--origin` for another Scape host.
-HTTP is accepted only for localhost. No local web server, inbound connection, VPN,
-browser-to-laptop request or tunnel is needed. Origin redirects are refused.
-
-Open the printed URL, sign in, compare the displayed pairing code with your terminal,
-and choose **Connect project** in the developer sidebar. The code expires after
-five minutes. Approval grants a two-hour, world-scoped session. Reconnecting replaces
-that world's previous session. Tokens stay in CLI memory and are never printed or
-written to disk. Disconnect in the sidebar or stop the command to revoke the token;
-a server restart also revokes sessions.
-
-The default entry is `src/definition.ts`; override it with `scape.entry` in package.json.
-New starters use `scape.entry: "src/project.ts"`. Export `defineProject({ objects: [...] })`
-as `default`; existing single-gizmo exports remain supported. The CLI bundles imported files and watches its build
-inputs plus package.json. Save a file to send a new build. Compilation and server
-validation errors appear in the terminal/sidebar; the previous accepted build remains
-active. This is a private development update, not a published tester preview.
-
-Create a blank project with `scape gizmo init /path/to/new-project` after installing
-the public CLI. Repository users can still use `yarn sdk:starter` to create a local
-archive-based kit for development.
-It never overwrites an existing directory. No voting or counter behavior is included.
-
-Projects can register up to 16 custom namespaced gizmos, each with a unique emoji and
-declarative view. Every update installs the entire project atomically; one invalid gizmo
-rejects the update without changing the previous build. Reordering gizmos preserves identity.
-The `scape.` namespace and built-in interactive emojis are reserved. The bundled learning
-examples can also be updated using their existing type, emoji and version. Keep your
-gizmo identity/version while instances are placed; remove them before changing it.
-All saved state must validate under an update, including when switching projects.
-Remove placed instances before removing their definition. Empty projects are allowed.
-There is no automatic migration, shared project state or reset. Public publishing remains
-later work. The entire project shares the 1 MiB upload limit including embedded models and audio. See the [developer guide](https://developer.scape.wtf/gizmos/quickstart).
-
-Scape executes uploaded code inside the restricted runtime and supplies real permission,
-identity, time and randomness to authoritative actions. The CLI never supplies saved
-state or membership credentials. The last accepted code and world state survive stopping
-local development. Reconnect to resume edits. Other local files, credentials and source
-maps are not uploaded.
-
-Procedural sounds upload as compact SDK definitions; the game renders them in a worker.
-Imported `.glb` and optional recorded PCM16 `.wav` files are embedded as base64 and included in source watching. See the
-[presentation contract](https://developer.scape.wtf/gizmos/presentation) for supported geometry, audio limits and authoring.
-
-Effect validation identifies the gizmo type, field, supplied number and allowed range.
-The terminal names the last confirmed build; the in-game sidebar names the working
-local revision, or says no local build is active. Correct the setting and save to retry.
-Rejected uploads do not replace the accepted build. Direct edits to Scape's built-in
-workspace packages bypass this upload recovery boundary; see the
-[effect recovery contract](https://developer.scape.wtf/gizmos/presentation#effect-diagnostics-and-recovery).
-
-## Contributor/source-workspace kits
-
-An operator with source access exports a kit with
-`yarn sdk:starter /path/to/new-project`. Exported source kits contain three local archives:
-`scape-sdk.tgz`, `scape-cli.tgz` and `scape-agent-mcp.tgz` under
-`vendor/`. The manifest uses local SDK/CLI dependencies and a Yarn resolution for the transitive MCP dependency. Keep the archives and resolutions together, then run
-`yarn install` in the exported project. Public third-party dependencies still need
-installation; this is not a fully offline kit. No game source or credentials are copied.
-
-An installed kit supports both command families without a source checkout.
-`yarn scape gizmo init /path/to/another-project` carries all three archives into a new
-blank project. Initial kit export still requires repository access; public projects should use the registry packages described above.
-
-### Diagnostic logs
-
-Run `scape agent configure`, select **Diagnostic logs → Detailed**, save and restart the agent. `scape agent status` shows the selected mode. Explicit projects can set `"logging": { "level": "debug" }` in `scape.agent.json`; the default is `standard`. Detailed terminal output includes request timing/counts, safe errors, decision recovery and social choices, tool outcomes, reply-review verdicts/probabilities, correction attempts and fallback reasons. Credentials, messages, drafts, prompts and raw provider/tool responses are excluded. Terminal diagnostics create no files or extra model calls. Optional Private reply traces (`logging.traceReplies: true`, default false) save drafts, dialogue, review context and verdicts to an owner-only `.scape-traces/replies.jsonl` file, capped at 1 MiB. Known credentials are redacted; review content before sharing, disable after debugging and delete the file while stopped to clear it. Traces are never uploaded automatically. Custom policies own their internal diagnostics. See [configuration](https://developer.scape.wtf/agents/configuration#diagnostic-logs).
-
-Reply review uses the current message as its target and treats character tone separately from relevance. A relevance rejection or uncertain grounding verdict can receive one independent conversation-provider check; it counts against the conversation budget. Confident unsupported claims require correction. Semantic rejections receive one reason-specific rewrite; unavailable/malformed reviewers use a temporary-error reply instead of asking the visitor to clarify.
-
-Reviews use bounded prior dialogue and confirmed actions rather than repeated world
-snapshots or private drafts. Recognized input-token failures report `context_limit`,
-and detailed decision requests include `inputBytes`. Once a reply is published,
-speech is removed from subsequent tool offerings for that turn. Duplicate attempts
-are skipped with `reply_already_published`; other requested actions can still finish.
-
-A rejected reply gets one fresh, speech-only correction from the current question
-and observed evidence. It must pass review before publication, and cannot perform
-actions to make an invented claim true. Detailed logs identify this request with
-`purpose=reply_correction`; malformed repair reports `invalid_correction`.
-A successfully reviewed correction ends the turn without resuming the rejected action plan. Clarification turns offer speech only. Detailed tool logs include a known `toolName`
-and fixed reasons for clarification, quiet/space, paused movement or speech still
-being read; those guards give the model actionable guidance without raw errors.
-
-## Terminal dashboard and tasks
-
-Run `scape` after installing `@scape-wtf/cli` to open the terminal application.
-`scape agent run --origin https://scape.wtf` starts the agent and opens its dashboard
-in an interactive terminal. Use `--no-tui` for scrolling output; redirected output
-and noninteractive processes use plain output automatically. Initial setup still
-requires a terminal or an explicitly configured project.
-
-The dashboard has four tabs: **Overview**, **Tasks**, **Memory**, and **Logs**.
-Press **1–4** or **Tab** to switch; **↑/↓** scroll. Overview offers **s** to start,
-**x** to stop, **c** to configure and **p** to pair with a world. Stop before changing
-configuration. **k** cancels the current task; **q** or **Ctrl+C** leaves the world
-and exits. A stopped agent can be started again from the dashboard. This is a
-local owner interface; no owner panel is added to the world UI. Project mode uses
-its `scape.agent.json` for configuration.
-
-Tasks contain up to eight ordered visit, use, approach or expression steps.
-Movement acceptance is not completion: the runner waits for observed arrival,
-and an interaction must succeed before the next step runs. A failed step cancels
-remaining steps and sends the confirmed outcome to the conversation model for a
-brief acknowledgement. New requests from the same player, stop/quiet requests,
-owner cancellation and departure cancel the plan. Plans are session-local and
-are not replayed after reconnecting. The model must select the plan tool correctly;
-arbitrary tours and lessons are not built-in routines.
-
-Overview shows model request counts and provider health independently of the
-configured log level. Logs retain the latest 300 entries in memory. They exclude
-API keys, conversation drafts and raw provider responses. The existing optional
-private reply trace remains separate from dashboard logs.
-
-## Optional conversation notes
-
-`memory.conversationNotes` defaults to `false`. Enable **Conversation notes** in
-Configure to accept explicit requests such as “Scout, remember that I like music”.
-Ordinary conversation is not automatically saved. Notes are player-authored context,
-not instructions or verified world facts. The agent can use a visitor's notes only
-in that visitor's world and agent scope, with the same Scape origin.
-
-Storage is local and owner-only, under `.scape-notes/notes.json` in the managed
-profile (`~/.scape`) or project memory directory (`.scape-memory`). Limits are
-500 characters per note, 20 notes per visitor/scope, 256 notes overall, and 30-day
-retention. Stable visitor identity is required. macOS, Linux and WSL support private
-persistence; unavailable storage leaves the agent running without notes.
-
-In Memory, use **↑/↓** to select a note, **Enter** to inspect its full text and **f**, then **y**, to forget it; **r**
-refreshes. A player can say “Scout, forget my notes” to remove their notes in the
-current scope. Command equivalents are:
-
-```sh
-scape agent memory notes list
-scape agent memory notes forget <note-id>
-scape agent memory notes clear
-scape agent memory notes enable
-scape agent memory notes disable
-```
-
-Command mutations require the managed agent to be stopped; dashboard controls work
-with its active store. Disabling notes preserves existing records until forgotten
-or expired. Encounter metadata remains a separate setting and contains no dialogue.
+The [CLI reference](https://developer.scape.wtf/reference/cli) lists commands, project settings and environment variables.

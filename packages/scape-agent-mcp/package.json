@@ -1,6 +1,6 @@
 {
   "name": "@scape-wtf/agent-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -75,7 +75,6 @@
     "runner-config.mjs",
     "model-policy.mjs",
     "policy-loader.mjs",
-    "transport.md",
     "providers.mjs",
     "provider-http.mjs",
     "runtime-logging.mjs",
@@ -94,6 +93,7 @@
     "encounters.mjs",
     "encounters.d.mts",
     "tasks.mjs",
+    "task-plans.mjs",
     "notes.mjs",
     "notes.d.mts"
   ],

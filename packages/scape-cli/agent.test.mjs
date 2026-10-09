@@ -44,8 +44,8 @@ test('registry installation creates an agent project with current public depende
   assert.equal(result.status, 0, result.stderr);
   const manifest = JSON.parse(await readFile(path.join(project, 'package.json'), 'utf8'));
   assert.deepEqual(manifest.dependencies, {
-    '@scape-wtf/cli': '0.1.4',
-    '@scape-wtf/agent-mcp': '0.1.3',
+    '@scape-wtf/cli': '0.1.5',
+    '@scape-wtf/agent-mcp': '0.1.4',
   });
   assert.equal(manifest.resolutions, undefined);
   assert.equal(existsSync(path.join(project, 'vendor')), false);

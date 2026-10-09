@@ -21,7 +21,7 @@ export function validGizmoTextEditor(value: unknown): value is GizmoTextEditor {
     Number(value.maxLength) <= 512
   );
 }
-/** Plain, bounded text only: hosts must never interpret this as HTML. */
+/** Validate bounded plain text; Scape displays it without interpreting HTML. */
 export function validGizmoWorldText(value: unknown): value is string {
   return (
     typeof value === 'string' &&

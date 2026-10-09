@@ -85,5 +85,5 @@ export interface GizmoSoundSamples {
 /** Sample rate used by Scape's portable procedural renderer. */
 export declare const GIZMO_SOUND_RATE = 48000;
 export declare function gizmoSynthError(value: unknown, path?: string): string | null;
-/** Deterministic PCM rendering. Hosts run this in a bounded worker, never on the game frame. */
+/** Render deterministic PCM samples for local audio tests. */
 export declare function renderGizmoSynth(sound: GizmoSynth): GizmoSoundSamples;

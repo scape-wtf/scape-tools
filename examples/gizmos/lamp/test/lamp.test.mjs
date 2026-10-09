@@ -39,3 +39,18 @@ test('each lamp owns its state; participants switch it and editors choose its co
     /Choose a lamp color/,
   );
 });
+
+test('Power accepts explicit on/off values and exposes state without changing the manual switch', () => {
+  const registry = new ObjectRegistry([lamp]);
+  const item = registry.create('🏮', 'connected-lamp-0001');
+  const context = { actorId: 'gizmo-signal', canEdit: false, now: 0, randomInt: () => 0 };
+  const off = registry.execute(item, { name: 'power', payload: { on: false } }, context);
+  assert.equal(off.instance.state.on, false);
+  assert.deepEqual(off.signals, { power: false });
+  assert.equal(lamp.inputs.power.combine, 'any');
+  assert.deepEqual(lamp.inputs.power.locks, ['toggle', 'power']);
+  assert.throws(
+    () => registry.act(item, { name: 'power', payload: { on: 'false' } }, context),
+    /on or off/,
+  );
+});

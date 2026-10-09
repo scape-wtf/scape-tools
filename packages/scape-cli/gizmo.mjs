@@ -92,8 +92,9 @@ export async function dev(directory, originValue) {
   url.searchParams.set('developer-connect', link.code);
   const ui = terminal();
   ui.heading('Gizmo development');
+  ui.link(url.href);
+  ui.line('Verify this code in Scape:', 'muted');
   ui.code(link.code);
-  ui.line(`Open ${url.href}`);
   ui.line('Sign in and connect only if Scape shows this code.');
   ui.busy('Waiting for your approval');
   const stop = () => {

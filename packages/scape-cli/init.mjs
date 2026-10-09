@@ -16,8 +16,8 @@ export function useKitArchives(manifest) {
 }
 
 export function useRegistryPackages(manifest) {
-  manifest.dependencies['@scape-wtf/sdk'] = '0.1.1';
-  manifest.devDependencies['@scape-wtf/cli'] = '0.1.4';
+  manifest.dependencies['@scape-wtf/sdk'] = '0.1.2';
+  manifest.devDependencies['@scape-wtf/cli'] = '0.1.5';
   delete manifest.resolutions;
 }
 

@@ -20,3 +20,5 @@ export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction } from 
 export type { GizmoFeedback, GizmoReaction, GizmoReactionContext, GizmoInteraction, } from './reaction.js';
 export * from './travel.js';
 export * from './navigation.js';
+export * from './connections.js';
+export * from './actionButtons.js';

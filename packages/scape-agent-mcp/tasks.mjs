@@ -1,38 +1,51 @@
-export const taskTool = {
+import { AGENT_BUILDING_ENABLED } from './contracts.mjs';
+import { compileTask, invalidPlan, taskStepSchema } from './task-plans.mjs';
+
+const creativeTaskTool = {
   name: 'agent_task',
   description:
-    'Queue an ordered physical task requested by the current speaker. Use one plan containing every requested step in order. For "play the piano, come back to me and smile", queue use(piano), approach(speaker), express(happy); do not omit the return even if the player was nearby before the first step. Each visit/use waits for confirmed arrival before advancing. Do not claim completion when the plan is only accepted.',
+    'Queue a complete creative or physical plan requested by the current speaker. For mazes, prefer action maze with odd width/height and an emoji (default 🧱); omit x/y to find nearby empty space automatically. It generates connected paths and entrance/exit. Build other large structures with compact tile-map rows and a palette; palette entries can configure piano notes or other objects. place adds one configured tile; use/visit/approach/express perform observed actions; wait adds a rest. Queue all work, not just one sample object. Up to 4096 expanded steps run over time without further model calls, paced to current limits. Progress is retained in this connection; stops, departure and reconnect cancel unfinished work. Acceptance is not completion.',
   inputSchema: {
     type: 'object',
     additionalProperties: false,
     required: ['steps'],
     properties: {
-      steps: {
-        type: 'array',
-        minItems: 1,
-        maxItems: 8,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['action', 'target'],
-          properties: {
-            action: { type: 'string', enum: ['visit', 'use', 'approach', 'express'] },
-            target: {
-              type: 'string',
-              maxLength: 120,
-              description:
-                'visit/use: exact scene.objects ID; approach: exact player ID; express: exact registered appearance.expressions name, such as happy (never a player or object ID).',
+      steps: { type: 'array', minItems: 1, maxItems: 512, items: taskStepSchema },
+    },
+  },
+};
+// Retain the experiment for later; only physical actions are advertised today.
+export const taskTool = AGENT_BUILDING_ENABLED
+  ? creativeTaskTool
+  : {
+      name: 'agent_task',
+      description:
+        'Queue ordered visits, uses of existing objects, player approaches, expressions and rests. Acceptance is not completion. Scenery editing is unavailable.',
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['steps'],
+        properties: {
+          steps: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 512,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['action'],
+              properties: {
+                action: { type: 'string', enum: ['visit', 'use', 'approach', 'express', 'wait'] },
+                target: taskStepSchema.properties.target,
+                repeat: taskStepSchema.properties.repeat,
+                milliseconds: taskStepSchema.properties.milliseconds,
+              },
             },
           },
         },
       },
-    },
-  },
-};
-const invalid = () =>
-  Object.assign(new Error('Choose 1–8 observed visit, use, approach or expression targets.'), {
-    code: 'invalid_target',
-  });
+    };
+const invalid = invalidPlan;
 
 /** Session-local plans: no replay across a reconnect, no claiming acceptance as completion. */
 export function createTaskQueue({ context, goals, call, now = Date.now, onChange = () => {} }) {
@@ -41,7 +54,27 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
   const history = [];
   const publish = () => {
     try {
-      onChange(history.map(task => ({ ...task, steps: task.steps.map(step => ({ ...step })) })));
+      onChange(
+        history.map(task => {
+          const start = task.steps.length <= 16 ? 0 : Math.max(0, task.index - 4);
+          return {
+            id: task.id,
+            player: task.player,
+            request: task.request,
+            status: task.status,
+            completed: task.index,
+            total: task.steps.length,
+            steps: task.steps.slice(start, start + 16).map((step, offset) => ({
+              action: step.action,
+              target: step.target,
+              label: step.label,
+              status: step.status,
+              ...(step.error ? { error: step.error } : {}),
+              index: start + offset,
+            })),
+          };
+        }),
+      );
     } catch {
       // A local display failure must not change execution or cancellation.
     }
@@ -63,12 +96,32 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
       player: task.player,
       request: task.request,
       status,
-      steps: task.steps.map(step => ({ ...step })),
+      completed: task.index,
+      total: task.steps.length,
+      steps: (task.steps.length <= 16
+        ? task.steps
+        : task.steps.slice(Math.max(0, task.index - 8), task.index + 8)
+      ).map(step => ({ ...step })),
+      ...(task.steps.length > 16 ? { truncated: true } : {}),
     };
   };
   return {
+    get progress() {
+      return active
+        ? {
+            task: active.id,
+            completed: active.index,
+            total: active.steps.length,
+            status: active.status,
+            next: active.steps[active.index]?.label,
+          }
+        : undefined;
+    },
     get busy() {
       return !!active;
+    },
+    due() {
+      return !!active && now() >= active.nextAt;
     },
     get player() {
       return active?.player;
@@ -76,31 +129,10 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
     cancel() {
       return finish('cancelled');
     },
-    start(steps, player) {
+    start(steps, player, catalog) {
       const state = context.observation;
-      if (
-        !player ||
-        !state.players.some(p => p.id === player) ||
-        !Array.isArray(steps) ||
-        !steps.length ||
-        steps.length > 8
-      )
-        throw invalid();
-      for (const step of steps) {
-        if (
-          !step ||
-          Object.keys(step).some(key => !['action', 'target'].includes(key)) ||
-          typeof step.target !== 'string' ||
-          step.target.length > 120
-        )
-          throw invalid();
-        const valid = ['visit', 'use'].includes(step.action)
-          ? state.scene?.objects.some(object => object.id === step.target)
-          : step.action === 'approach'
-            ? (state.roster ?? state.players).some(person => person.id === step.target)
-            : step.action === 'express' && state.appearance?.expressions?.includes(step.target);
-        if (!valid) throw invalid();
-      }
+      if (!player || !state.players.some(p => p.id === player)) throw invalid();
+      steps = compileTask(steps, state, catalog);
       if (active)
         throw Object.assign(
           new Error('A task is already active. Wait for its result or cancel it.'),
@@ -121,11 +153,17 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
           const label = String(
             object
               ? `${object.emoji || 'Object'} at ${object.x},${object.y}`
-              : person?.name || step.target,
+              : person?.name ||
+                  (step.action === 'place'
+                    ? `${step.emoji} at ${step.x},${step.y}`
+                    : step.action === 'wait'
+                      ? `Rest ${step.milliseconds}ms`
+                      : step.target),
           ).slice(0, 120);
           return { ...step, label, status: 'pending' };
         }),
         index: 0,
+        nextAt: 0,
       };
       history.unshift(active);
       history.length = Math.min(history.length, 20);
@@ -135,7 +173,7 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
     },
     async advance(tools) {
       const task = active;
-      if (!task) return;
+      if (!task || now() < task.nextAt) return;
       if (
         !(context.observation.roster ?? context.observation.players).some(p => p.id === task.player)
       )
@@ -146,9 +184,37 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
           step.status = 'running';
           step.expiresAt = now() + 45000;
           publish();
-          if (step.action === 'express')
+          if (step.action === 'wait') {
+            task.nextAt = now() + step.milliseconds;
+            return;
+          }
+          if (step.action === 'place') {
+            const observed = await call('scape_observe', {}, tools);
+            if (active !== task || context.signal.aborted) return;
+            if (!observed.scene?.editCapabilities?.canPlace)
+              throw Object.assign(new Error(), { code: 'editing_not_granted' });
+            if (observed.self?.floor !== step.floor) throw invalid();
+            const placement = {
+              x: step.x,
+              y: step.y,
+              floor: step.floor,
+              emoji: step.emoji,
+              ...(step.objectConfig ? { objectConfig: step.objectConfig } : {}),
+            };
+            const result = await call(
+              'scape_place_object',
+              { ...placement, sceneRevision: observed.scene.sceneRevision },
+              tools,
+            );
+            if (!result?.ok) throw Object.assign(new Error(), { code: 'invalid_edit' });
+            step.result = { operationId: result.operationId, sceneRevision: result.sceneRevision };
+            // Leave room for conversation/other actions within the gateway's 120/min allowance.
+            const perMinute = Math.min(90, observed.scene.editCapabilities.maxEditsPerMinute || 30);
+            task.nextAt = now() + Math.ceil(60000 / perMinute);
+          } else if (step.action === 'express') {
             await call('scape_expression', { expression: step.target }, tools);
-          else if (step.action === 'approach')
+            task.nextAt = now() + 1100;
+          } else if (step.action === 'approach')
             await call('scape_approach', { player: step.target }, tools);
           else await goals.start(step.target, step.action === 'use', task.player, tools);
         } else if (['visit', 'use'].includes(step.action)) {
@@ -180,9 +246,23 @@ export function createTaskQueue({ context, goals, call, now = Date.now, onChange
         context.requestTurn();
       } catch (error) {
         if (active !== task || context.signal.aborted) return;
+        if (
+          error.code === 'rate_limited' ||
+          (step.action === 'place' && error.code === 'stale_scene')
+        ) {
+          step.status = 'pending';
+          task.nextAt = now() + (error.code === 'rate_limited' ? 60000 : 1000);
+          publish();
+          return;
+        }
         // Access and transport failures still reach the runtime's existing recovery boundary.
         if (
           ![
+            'editing_not_granted',
+            'edit_forbidden',
+            'edit_conflict',
+            'invalid_edit',
+            'edit_receipt_unavailable',
             'interaction_unavailable',
             'target_unavailable',
             'stale_target',

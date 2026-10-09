@@ -7,7 +7,50 @@ import {
   reviewHistoryTurn,
   actionEvidence,
   activityEvidence,
+  compactReviewState,
 } from './reply-review.mjs';
+
+test('FR-181: large build reply checks retain evidence once without duplicated scene inventories', () => {
+  const objects = Array.from({ length: 128 }, (_, i) => ({
+    id: String(i),
+    x: i % 64,
+    y: Math.floor(i / 64),
+    emoji: '🧱',
+    editTarget: 'x'.repeat(64),
+    canRemove: true,
+  }));
+  const outcome = {
+    type: 'task_result',
+    status: 'complete',
+    completed: 70,
+    total: 70,
+    steps: [{ action: 'place', emoji: '🧱', status: 'complete' }],
+  };
+  const recentActions = [
+    { tool: 'scape_place_object', args: { x: 1, y: 1 }, result: { ok: true } },
+  ];
+  const state = {
+    observation: { scene: { objects, blocked: [1, 2] }, objects, blocked: [1, 2] },
+    target: { outcome },
+    recentActions,
+    events: [outcome, { type: 'social', recentActions, history: [{ text: 'build a maze' }] }],
+  };
+  const compact = compactReviewState(state);
+  assert.ok(JSON.stringify(compact).length < JSON.stringify(state).length * 0.5);
+  assert.deepEqual(compact.target.outcome, outcome);
+  assert.deepEqual(compact.recentActions, recentActions);
+  assert.equal(compact.observation.scene.objects.length, 128);
+  assert.equal(compact.observation.scene.objects[0].canRemove, true);
+  assert.equal(
+    compactReviewState({ observation: { scene: { objects: [{ canRemove: false }] } } }).observation
+      .scene.objects[0].canRemove,
+    false,
+  );
+  assert.equal(compact.events.length, 1);
+  assert.deepEqual(compact.events[0].history, [{ text: 'build a maze' }]);
+  assert.equal(state.observation.objects.length, 128);
+  assert.equal(state.observation.scene.objects[0].editTarget.length, 64);
+});
 
 test('BUG-177: unsupported activity is rewritten from fresh evidence without the rejected claim or action tools', async () => {
   const config = cfg();

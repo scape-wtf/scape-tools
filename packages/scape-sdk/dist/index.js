@@ -18,3 +18,5 @@ export * from './sprite.js';
 export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction } from './reaction.js';
 export * from './travel.js';
 export * from './navigation.js';
+export * from './connections.js';
+export * from './actionButtons.js';

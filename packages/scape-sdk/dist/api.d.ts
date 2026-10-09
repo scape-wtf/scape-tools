@@ -1,3 +1,5 @@
+import type { ActionButton } from './actionButtons.js';
+import type { GizmoConnection, GizmoInput, GizmoOutput, GizmoSignals } from './connections.js';
 import type { GizmoNavigation, GizmoWorldEditor } from './navigation.js';
 import type { GizmoLink, GizmoTravel, GizmoEnvironment } from './travel.js';
 import type { GizmoInteraction, GizmoReaction, GizmoReactionContext } from './reaction.js';
@@ -13,9 +15,9 @@ import type { GizmoGlow } from './glow.js';
 import type { GizmoAmbience, GizmoSounds, GizmoAudioTimeline } from './audio.js';
 import type { GizmoTextEditor } from './text.js';
 import type { GizmoPresentation, GizmoTimeline } from './presentation.js';
-/** Experimental Scape object authoring contract. Execution isolation is supplied by the host, not this authoring API. */
+/** Scape object definition. Scape isolates uploaded code; local SDK tests do not. */
 export interface ObjectInstance {
-    /** Stable identity assigned by the host for one placed instance. */
+    /** Stable identity assigned by Scape for one placed instance. */
     id: string;
     /** Namespaced definition type that created this instance. */
     type: string;
@@ -23,8 +25,12 @@ export interface ObjectInstance {
     version: number;
     /** Author-owned state returned by the definition's `initial` and actions. */
     state: unknown;
-    /** Optional host-managed link identity for grouped world behavior. */
+    /** Optional Scape-managed link identity for grouped world behavior. */
     linkId?: string;
+    /** Scape-owned outgoing wires; excluded from portable configuration. */
+    connections?: GizmoConnection[];
+    /** Last applied held inputs, maintained by Scape, never authored state. */
+    signalInputs?: Record<string, boolean>;
 }
 /** Portable editor values only; identities and live state never cross placements. */
 export interface ObjectConfiguration {
@@ -55,12 +61,12 @@ export interface ObjectContext extends ObjectViewer {
 export interface ObjectAction {
     /** Action key declared in the definition. */
     name: string;
-    /** JSON-compatible action input, validated by the host before execution. */
+    /** JSON-compatible action input, validated by Scape before execution. */
     payload: Record<string, unknown>;
 }
 /** A participant/editor control rendered by Scape's shared configuration UI. */
 export interface ObjectControl {
-    /** Stable control identifier used by the host for focus and drafts. */
+    /** Stable control identifier used by Scape for focus and drafts. */
     id: string;
     /** Accessible button label and tooltip. */
     label: string;
@@ -70,13 +76,15 @@ export interface ObjectControl {
     disabled?: boolean;
     /** Current state for a toggle control. */
     pressed?: boolean;
-    /** Confirmation message shown before a destructive action. */
+    /** Confirmation message shown before an action. Required for an icon-first button. */
     confirm?: string;
+    /** Two-step content action using a preset or approved icon ID; requires confirm. */
+    button?: ActionButton;
     /** Editor field identifiers submitted with this control. */
     fields?: string[];
     /** Host action-row switch for a participant action without fields; requires boolean pressed state. */
     icon?: 'toggle';
-    /** Icon-only action row button; defaults to the host's media-play-filled icon. Permissions are unchanged. */
+    /** Icon-only action row button; defaults to Scape’s media-play-filled icon. Permissions are unchanged. */
     placement?: 'action';
     /** Save on a select change, with no separate button. All referenced fields must be selects. */
     trigger?: 'change';
@@ -85,7 +93,7 @@ export interface ObjectControl {
     /** Audition this named local preview with the same payload before a normal action. */
     preview?: string;
 }
-/** A finite choice is author data; the host never interprets its value as a game feature. */
+/** A finite choice is author data; Scape never interprets its value as a game feature. */
 export interface ObjectChoice {
     /** Stable submitted value. */
     value: string;
@@ -123,7 +131,7 @@ export interface ObjectDefinition {
     type: string;
     /** Increment when saved state or behavior becomes incompatible. */
     version: number;
-    /** Unique emoji identity used by the host catalog. */
+    /** Unique emoji identity used by Scape catalog. */
     emoji: string;
     /** Short human-readable name shown in the developer and world UI. */
     label: string;
@@ -138,6 +146,9 @@ export interface ObjectDefinition {
         permission: 'participant' | 'editor' | 'remover';
         run: (state: unknown, payload: Record<string, unknown>, context: ObjectContext) => unknown;
     }>;
+    inputs?: Record<string, GizmoInput>;
+    outputs?: Record<string, GizmoOutput>;
+    signals?: (state: unknown, previous: unknown, action: ObjectAction | null) => GizmoSignals;
     interaction?: GizmoInteraction;
     areaRemoval?: {
         radiusCells: number;
@@ -176,7 +187,7 @@ export interface ObjectDefinition {
     travel?: (state: unknown) => GizmoTravel | null;
     /** Decorative rotation in radians/second; disabled for reduced motion. */
     spin?: number;
-    /** State-derived directional push while occupied. Requires walkable: true; host owns movement. */
+    /** State-derived directional push while occupied. Requires walkable: true; Scape handles movement. */
     push?: (state: unknown) => GizmoPush | null;
     /** Cosmetic arrival feedback only. Does not grant walkability or change saved state. */
     step?: (state: unknown, event: GizmoStepEvent) => GizmoStepEffects | null;
@@ -191,7 +202,8 @@ export declare const exactKeys: (value: Record<string, unknown>, keys: string[])
 export declare const actorId: (value: unknown) => value is string;
 export declare const objectId: (value: unknown) => value is string;
 /** Typed authoring helper; the registry checks state before invoking an implementation. */
-export declare function defineObject<S>(definition: Omit<ObjectDefinition, 'initial' | 'valid' | 'actions' | 'view' | 'animate' | 'worldText' | 'audio' | 'lighting' | 'step' | 'push' | 'soundBank' | 'previews' | 'sprite' | 'react' | 'travel' | 'navigate'> & {
+export declare function defineObject<S>(definition: Omit<ObjectDefinition, 'signals' | 'initial' | 'valid' | 'actions' | 'view' | 'animate' | 'worldText' | 'audio' | 'lighting' | 'step' | 'push' | 'soundBank' | 'previews' | 'sprite' | 'react' | 'travel' | 'navigate'> & {
+    signals?: (state: S, previous: S, action: ObjectAction | null) => GizmoSignals;
     initial: () => S;
     valid: (state: unknown) => state is S;
     actions: Record<string, {

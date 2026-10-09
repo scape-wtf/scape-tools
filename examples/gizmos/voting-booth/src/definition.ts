@@ -166,6 +166,8 @@ export const votingBooth = defineObject<VotingState>({
                   {
                     id: 'configure',
                     label: 'Save question',
+                    button: { preset: 'save' as const },
+                    confirm: 'Save question?',
                     fields: ['question', 'choice0', 'choice1', 'choice2', 'choice3'],
                     action: { name: 'configure', payload: { round: state.round } },
                   },
@@ -174,11 +176,14 @@ export const votingBooth = defineObject<VotingState>({
             {
               id: 'toggle',
               label: state.open ? 'Close voting' : 'Reopen voting',
+              button: { preset: state.open ? ('close' as const) : ('start' as const) },
+              confirm: state.open ? 'Close voting?' : 'Reopen voting?',
               action: { name: 'toggle', payload: { round: state.round } },
             },
             {
               id: 'reset',
               label: 'Reset poll',
+              button: { preset: 'reset' as const },
               confirm: 'Clear all votes?',
               action: { name: 'reset', payload: { round: state.round } },
             },

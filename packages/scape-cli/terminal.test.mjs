@@ -7,7 +7,7 @@ const choices = [
   { value: 'two', label: 'Second option' },
   { value: 'three', label: 'Third option' },
 ];
-function fixture(env = { TERM: 'xterm' }) {
+function fixture(env = { TERM: 'xterm' }, outputTTY = true) {
   const input = new PassThrough();
   input.isTTY = true;
   input.isRaw = false;
@@ -19,7 +19,7 @@ function fixture(env = { TERM: 'xterm' }) {
       done();
     },
   });
-  output.isTTY = true;
+  output.isTTY = outputTTY;
   output.columns = 54;
   output.rows = 14;
   return {
@@ -34,6 +34,60 @@ function fixture(env = { TERM: 'xterm' }) {
     },
   };
 }
+test('pairing codes use four-character groups matching the UI in rich and plain terminals', () => {
+  for (const env of [{ TERM: 'xterm' }, { TERM: 'xterm', NO_COLOR: '' }]) {
+    for (const code of ['3E918DFED133', '3E91 8DFE D133']) {
+      const f = fixture(env);
+      f.ui.code(code);
+      assert.ok(f.text.includes('│  3E91 8DFE D133        │'));
+      assert.doesNotMatch(f.text, /3E918DFED133/);
+      f.input.destroy();
+    }
+  }
+});
+test('pairing code grouping preserves a shorter final group', () => {
+  const f = fixture();
+  f.ui.code('ABCDEF');
+  assert.match(f.text, /ABCD EF/);
+  f.input.destroy();
+});
+test('browser links preserve the complete destination on narrow terminals and close hyperlink styling', () => {
+  const f = fixture();
+  const url = 'https://staging.scape.wtf/?playground=1&developer-connect=TEST12345678';
+  f.output.columns = 24;
+  f.ui.link(url);
+  f.ui.line('Verify this code');
+  assert.ok(f.text.includes(`\x1b]8;;${url}\x1b\\`));
+  assert.ok(f.text.includes(`m${url}\x1b[0m\x1b]8;;\x1b\\\n`));
+  assert.match(f.text, /Open in your browser/);
+  assert.match(f.text, /Cmd\/Ctrl-click/);
+  assert.ok(f.text.endsWith('  Verify this code\n'));
+  f.input.destroy();
+});
+test('browser links remain complete plain text when redirected or styling is disabled', () => {
+  for (const [env, outputTTY] of [
+    [{ TERM: 'xterm' }, false],
+    [{ TERM: 'dumb' }, true],
+    [{ TERM: 'xterm', NO_COLOR: '' }, true],
+  ]) {
+    const f = fixture(env, outputTTY);
+    const url = 'https://scape.wtf/?playground=1&developer-connect=TEST12345678';
+    f.ui.link(url);
+    assert.ok(f.text.includes(`  ${url}\n`));
+    assert.doesNotMatch(f.text, /\x1b/);
+    f.input.destroy();
+  }
+});
+test('browser links reject non-web destinations and sanitize terminal control characters', () => {
+  const f = fixture();
+  assert.throws(() => f.ui.link('javascript:alert(1)'), /HTTP or HTTPS/);
+  assert.throws(() => f.ui.link('not a URL'), TypeError);
+  assert.equal(f.text, '');
+  f.ui.link('https://scape.wtf/\x07\n\u202e');
+  assert.ok(f.text.includes('\x1b]8;;https://scape.wtf/\x1b\\'));
+  assert.doesNotMatch(f.text, /\x07|\u202e/);
+  f.input.destroy();
+});
 test('arrow keys, space and enter select an option and restore terminal state', async () => {
   const f = fixture();
   const selected = f.ui.choose('Provider', choices, 'one');

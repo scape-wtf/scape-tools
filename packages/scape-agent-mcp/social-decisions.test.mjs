@@ -62,3 +62,31 @@ test('BUG-179: social perception receives capability limits before selecting phy
   assert.equal(result.people[0].action, 'reply');
   assert.equal(result.people[0].object, undefined);
 });
+
+test('editing intent is available only with observed effective editing permission', async () => {
+  for (const canPlace of [false, true]) {
+    const player = { id: 'visitor', text: 'Place a tree please' };
+    const result = await perceiveSocialTurn({
+      config: { name: 'Bot', instructions: '' },
+      turn: { events: [{ type: 'speech', player }] },
+      observation: {
+        self: { x: 1, y: 1, floor: 0 },
+        players: [player],
+        scene: { objects: [], editCapabilities: { enabled: true, canPlace } },
+      },
+      client: {
+        async evaluate({ state, questions }) {
+          assert.equal(state.capabilities.worldEditing, canPlace);
+          assert.match(questions.p0_action.criteria.edit, /worldEditing is true/);
+          return {
+            activity: { choice: 'stay' },
+            mood: { choice: 'neutral' },
+            p0_action: { choice: canPlace ? 'edit' : 'reply' },
+            p0_tone: { choice: 'neutral' },
+          };
+        },
+      },
+    });
+    assert.equal(result.people[0].action, canPlace ? 'edit' : 'reply');
+  }
+});

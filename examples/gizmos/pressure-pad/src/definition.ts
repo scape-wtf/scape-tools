@@ -11,6 +11,11 @@ export const pressurePad = defineObject<Record<string, never>>({
   initial: () => ({}),
   valid: (state): state is Record<string, never> => record(state) && exactKeys(state, []),
   actions: {},
+  outputs: {
+    pressed: { label: 'Someone steps on', kind: 'event', source: 'arrival' },
+    released: { label: 'Someone steps off', kind: 'event', source: 'departure' },
+    occupied: { label: 'While occupied', kind: 'boolean', source: 'occupancy' },
+  },
   walkable: true,
   sounds: {
     note: {

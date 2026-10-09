@@ -11,8 +11,7 @@ shared state, identity, permissions and popover UI; the example imports only
 
 See [Run an example](https://developer.scape.wtf/examples/gizmos/counter#run-this-example) for public setup and making an
 independent copy. Inside this example directory, run `npm run build`, `npm test`
-and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf` by default;
-use `--origin <https-url>` only for another compatible host.
+and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf`.
 
 Tests cover participant increments, editor-only reset and the upper bound.
 In the developer world, place Counter and try those actions with two players.

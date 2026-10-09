@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createModelPolicy as createPolicy } from './model-policy.mjs';
 import { parseAgentConfig } from './runner-config.mjs';
+import { TaskPlanError } from './task-plans.mjs';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +42,37 @@ const context = () => ({
 });
 const response = body =>
   new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+
+test('FR-181: layout repair receives trusted compiler detail and private failure diagnostics', async () => {
+  const requests = [],
+    traces = [];
+  const cfg = config('openrouter');
+  cfg.behavior.checkReplies = false;
+  const policy = createPolicy({
+    config: cfg,
+    toolDefinitions: [...definitions, { name: 'agent_task', inputSchema: { type: 'object' } }],
+    onReplyTrace: async record => traces.push(record),
+    fetchImpl: async (_, options) => {
+      const body = JSON.parse(options.body);
+      requests.push(body);
+      if (requests.length === 2) {
+        assert.match(JSON.stringify(body.messages), /Build row 2 must have width 9/);
+        assert.doesNotMatch(JSON.stringify(body.messages), /Choose only target IDs/);
+      }
+      return response(reply('openrouter', { name: 'agent_task', args: { steps: [] } }));
+    },
+  });
+  let attempts = 0;
+  const ctx = context();
+  ctx.tools.call = async () => {
+    if (++attempts === 1) throw new TaskPlanError('Build row 2 must have width 9.');
+    return { accepted: true };
+  };
+  await policy.onTurn({ events: [{ type: 'speech', player: ctx.observation.players[0] }] }, ctx);
+  assert.equal(attempts, 2);
+  assert.equal(traces[0].source, 'task_validation');
+  assert.deepEqual(traces[0].args, { steps: [] });
+});
 function reply(type, call) {
   if (['openai', 'xai'].includes(type))
     return {

@@ -207,7 +207,7 @@ function signalChain(stages: GizmoSignalStage[] = [], rate: number): (sample: nu
   };
 }
 
-/** Deterministic PCM only. Hosts render this in a worker, with their normal time/cache budgets. */
+/** Render deterministic PCM samples for local audio tests. */
 export function renderGizmoPartials(
   sound: GizmoPartialsSound,
   rate = GIZMO_SOUND_RATE,

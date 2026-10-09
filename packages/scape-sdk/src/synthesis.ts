@@ -283,7 +283,7 @@ function polyBlep(phase: number, step: number): number {
   }
   return 0;
 }
-/** Deterministic PCM rendering. Hosts run this in a bounded worker, never on the game frame. */
+/** Render deterministic PCM samples for local audio tests. */
 export function renderGizmoSynth(sound: GizmoSynth): GizmoSoundSamples {
   const error = gizmoSynthError(sound);
   if (error) throw new Error(error);

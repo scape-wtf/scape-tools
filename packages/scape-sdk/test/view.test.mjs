@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validObjectView } from '../dist/index.js';
+import {
+  ACTION_ICONS,
+  ACTION_BUTTON_PRESETS,
+  actionButtonIcon,
+  validObjectView,
+} from '../dist/index.js';
 
 const view = () => ({
   title: 'Choices',
@@ -100,4 +105,45 @@ test('action-row placement supports ordinary actions and local previews without 
   action.controls[0].kind = undefined;
   action.controls[0].trigger = 'change';
   assert.equal(validObjectView(action), false);
+});
+
+test('icon-first buttons accept only approved IDs or presets and explicit confirmation', () => {
+  for (const button of [
+    ...ACTION_ICONS.map(icon => ({ icon })),
+    ...Object.keys(ACTION_BUTTON_PRESETS).map(preset => ({ preset })),
+  ]) {
+    const value = view();
+    Object.assign(value.controls[0], { button, confirm: 'Save changes?' });
+    assert.equal(validObjectView(value), true);
+    assert.ok(ACTION_ICONS.includes(actionButtonIcon(button)));
+  }
+  for (const button of [
+    {},
+    { icon: 'unknown' },
+    { icon: '✅' },
+    { icon: '/custom.svg' },
+    { preset: 'constructor' },
+    { preset: 'toString' },
+    { preset: 'save', icon: 'check' },
+    { icon: 'check', svg: '<svg/>' },
+    null,
+  ]) {
+    const value = view();
+    Object.assign(value.controls[0], { button, confirm: 'Save?' });
+    assert.equal(validObjectView(value), false, JSON.stringify(button));
+  }
+  for (const conflict of [
+    { confirm: undefined },
+    { confirm: ' ' },
+    { label: ' ' },
+    { placement: 'action' },
+    { icon: 'toggle', pressed: true },
+    { trigger: 'change' },
+    { kind: 'preview' },
+    { pressed: false },
+  ]) {
+    const value = view();
+    Object.assign(value.controls[0], { button: { preset: 'save' }, confirm: 'Save?' }, conflict);
+    assert.equal(validObjectView(value), false, JSON.stringify(conflict));
+  }
 });

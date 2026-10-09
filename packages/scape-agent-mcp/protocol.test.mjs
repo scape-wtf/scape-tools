@@ -49,7 +49,11 @@ for (const umbrella of [false, true]) {
     assert.ok(!stdout.includes(secret));
     await assert.rejects(
       run(process.execPath, launch('http://public.example.invalid', true)),
-      error => error.code === 1 && error.stdout === '' && /HTTPS origin/.test(error.stderr),
+      error =>
+        error.code === 1 &&
+        error.stdout === '' &&
+        /scape agent mcp config/.test(error.stderr) &&
+        !/loopback|packages\//.test(error.stderr),
     );
   });
 
@@ -171,6 +175,10 @@ for (const umbrella of [false, true]) {
           true,
         );
         assert.equal((await call('scape_step', { x: 0, y: GRID.height, floor: 0 })).isError, true);
+        await assert.rejects(
+          call('scape_place_object', { x: 8, y: 8, floor: 0, sceneRevision: 0, emoji: '#' }),
+          /not found/i,
+        );
         assert.equal(
           (await call('scape_speak', { text: 'x'.repeat(MAX_STATUS_TEXT_LENGTH + 1) })).isError,
           true,
@@ -186,6 +194,16 @@ for (const umbrella of [false, true]) {
           undefined,
         );
         assert.equal((await call('scape_move_to', { x: 4, y: 3, floor: 0 })).isError, undefined);
+        for (const name of ['scape_object_catalog', 'scape_place_object', 'scape_remove_object'])
+          await assert.rejects(
+            call(name, { x: 8, y: 8, floor: 0, emoji: '🌲', sceneRevision: 0 }),
+            /not found/i,
+          );
+        assert.ok(
+          !requests.some(r =>
+            ['place-object', 'remove-object', 'object-catalog'].includes(r.action),
+          ),
+        );
         assert.equal((await call('scape_stop')).isError, undefined);
         assert.equal(requests.find(r => r.action === 'speak').value.id, 'speech-fixture-01');
         assert.match(requests.find(r => r.action === 'move-to').value.id, /^[a-f0-9]{64}$/);

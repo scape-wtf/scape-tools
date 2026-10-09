@@ -83,10 +83,10 @@ export function dashboard({
     if (tab === 1)
       return state.tasks.length
         ? state.tasks.flatMap(task => [
-            `${task.status} · ${task.steps.filter(step => step.status === 'complete').length}/${task.steps.length} steps`,
+            `${task.status} · ${task.completed ?? task.steps.filter(step => step.status === 'complete').length}/${task.total ?? task.steps.length} steps`,
             ...task.steps.map(
               (step, i) =>
-                `  ${i + 1}. ${step.action}${step.target ? ` ${fitLine(step.label || step.target, 30)}` : ''} · ${step.status}${step.error ? ` (${step.error})` : ''}`,
+                `  ${(step.index ?? i) + 1}. ${step.action}${step.label || step.target ? ` ${fitLine(step.label || step.target, 30)}` : ''} · ${step.status}${step.error ? ` (${step.error})` : ''}`,
             ),
             '',
           ])

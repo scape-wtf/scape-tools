@@ -18,3 +18,12 @@ test('standalone pressure pad reacts to walking and conveyor arrival without sav
     assert.deepEqual(pad.state, {});
   }
 });
+
+test('connection outputs are host-observed events and occupancy, independent of cosmetic step feedback', () => {
+  assert.equal(pressurePad.outputs.pressed.source, 'arrival');
+  assert.equal(pressurePad.outputs.released.source, 'departure');
+  assert.equal(pressurePad.outputs.occupied.kind, 'boolean');
+  assert.equal(pressurePad.outputs.occupied.source, 'occupancy');
+  assert.deepEqual(pressurePad.initial(), {});
+  assert.equal(pressurePad.signals, undefined);
+});

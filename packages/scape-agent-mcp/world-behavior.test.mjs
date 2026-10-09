@@ -4,6 +4,42 @@ import { createWorldBehavior, createBehaviorMemory } from './world-behavior.mjs'
 import { parseAgentConfig } from './runner-config.mjs';
 import { createDecisionClient } from './decision.mjs';
 import { runAgentPresence } from './presence.mjs';
+import { taskTool } from './tasks.mjs';
+import { AGENT_BUILDING_ENABLED } from './contracts.mjs';
+
+test('parked building is not advertised and rejects forged creative plans even against an older server', async () => {
+  assert.equal(AGENT_BUILDING_ENABLED, false);
+  assert.deepEqual(taskTool.inputSchema.properties.steps.items.properties.action.enum, [
+    'visit',
+    'use',
+    'approach',
+    'express',
+    'wait',
+  ]);
+  let reached = false;
+  const f = fixture({
+    buildingEnabled: false,
+    decision: decisionFixture('edit'),
+    policy: {
+      async onTurn(_turn, context) {
+        reached = true;
+        await assert.rejects(context.tools.call('agent_task', { steps: [{ action: 'maze' }] }), {
+          code: 'editing_not_granted',
+        });
+        await assert.rejects(
+          context.tools.call('scape_place_object', { emoji: '🌲', x: 1, y: 1, floor: 0 }),
+          { code: 'editing_not_granted' },
+        );
+      },
+    },
+  });
+  f.observe({ scene: { objects: [], editCapabilities: { canPlace: true } } });
+  await f.turn([{ type: 'speech', player: f.speech('Scout, build a maze') }]);
+  assert.equal(reached, true);
+  assert.ok(
+    !f.calls.some(call => ['scape_place_object', 'scape_object_catalog'].includes(call.name)),
+  );
+});
 const player = {
   id: 'human',
   name: 'Human',
@@ -19,6 +55,7 @@ function fixture({
   memory = createBehaviorMemory(),
   policy = { async onTurn() {} },
   behavior = {},
+  buildingEnabled = true,
   decision,
 } = {}) {
   let time = 100000,
@@ -59,7 +96,15 @@ function fixture({
     },
   };
   const config = parseAgentConfig({ name, provider: { type: 'ollama', model: 'test' }, behavior });
-  const agent = createWorldBehavior({ config, context, policy, memory, decision, now: () => time });
+  const agent = createWorldBehavior({
+    config,
+    context,
+    policy,
+    memory,
+    decision,
+    buildingEnabled,
+    now: () => time,
+  });
   return {
     agent,
     context,
@@ -683,7 +728,7 @@ test('decision interaction uses adjacent objects and creates arrival goals for d
     });
     const p = f.speech('Please play that piano');
     await f.turn([{ type: 'speech', player: p }]);
-    assert.equal(replies, x === 2 ? 1 : 0);
+    assert.equal(replies, 0); // interaction acceptance is not yet a played piano key
     assert.equal(
       f.calls.some(c => c.name === 'scape_interact'),
       x === 2,
@@ -879,6 +924,8 @@ test('compound action requests reach the planner even when the decision model se
   assert.ok(!f.calls.some(call => call.name === 'scape_interact'));
   await f.turn();
   assert.equal(f.calls.filter(call => call.name === 'scape_interact').length, 1);
+  f.observe({ self: { ...f.context.observation.self, x: 2, y: 1 }, interacting: false });
+  await f.turn();
   await f.turn();
   assert.equal(outcomes.length, 1);
   assert.equal(outcomes[0].status, 'complete');
@@ -962,9 +1009,9 @@ test('confirmed task outcomes survive a temporary conversation failure without r
   f.observe({
     scene: { blocked: [], objects: [{ id: 'a'.repeat(64), x: 2, y: 1, floor: 0, emoji: '🎹' }] },
   });
-  await assert.rejects(f.turn([{ type: 'speech', player: f.speech('Scout, play the piano') }]), {
-    code: 'provider_unavailable',
-  });
+  await f.turn([{ type: 'speech', player: f.speech('Scout, play the piano') }]);
+  f.observe({ self: { ...f.context.observation.self, x: 2, y: 1 }, interacting: false });
+  await assert.rejects(f.turn(), { code: 'provider_unavailable' });
   await f.turn();
   assert.equal(attempts, 2);
   assert.equal(f.calls.filter(call => call.name === 'scape_interact').length, 1);
@@ -986,4 +1033,95 @@ test('BUG-179: perceived conversation is marked read-only while expression reque
     await f.turn([{ type: 'speech', player: p }]);
     assert.equal(social.conversationOnly, action === 'reply');
   }
+});
+
+test('approved compound editing requests reach editing tools without becoming movement tasks', async () => {
+  let social;
+  const f = fixture({
+    decision: decisionFixture('edit'),
+    policy: {
+      async onTurn(turn, context) {
+        social = turn.events.find(event => event.type === 'social');
+        await context.tools.call('scape_place_object', {
+          emoji: '🌲',
+          x: 4,
+          y: 4,
+          floor: 0,
+          sceneRevision: 0,
+        });
+      },
+    },
+  });
+  f.observe({ scene: { objects: [], editCapabilities: { enabled: true, canPlace: true } } });
+  await f.turn([{ type: 'speech', player: f.speech('Scout, place a tree and a flower') }]);
+  assert.equal(social.conversationOnly, false);
+  assert.equal(social.taskPlanning, false);
+  assert.equal(f.calls.filter(call => call.name === 'scape_place_object').length, 1);
+});
+
+test('FR-181: shared behavior executes a large building request without returning to the model per tile', async () => {
+  let modelCalls = 0,
+    placed = 0,
+    result;
+  const f = fixture({
+    decision: decisionFixture('edit'),
+    policy: {
+      async onTurn(turn, context) {
+        modelCalls++;
+        const outcome = turn.events.find(e => e.type === 'task_result');
+        if (outcome) {
+          result = outcome;
+          assert.ok(
+            !turn.events
+              .find(e => e.type === 'social')
+              .recentActions.some(e => e.tool === 'scape_observe'),
+          );
+          return;
+        }
+        await context.tools.call('agent_task', {
+          steps: [
+            {
+              action: 'build',
+              x: 0,
+              y: 10,
+              floor: 0,
+              rows: Array(15).fill('#'.repeat(20)),
+              palette: [{ symbol: '#', emoji: '🧱' }],
+            },
+          ],
+        });
+      },
+    },
+  });
+  f.observe({
+    scene: {
+      sceneRevision: 0,
+      blocked: [],
+      objects: [],
+      editCapabilities: { canPlace: true, maxEditsPerMinute: 120 },
+    },
+  });
+  const call = f.context.tools.call;
+  f.context.tools.call = async (name, args) => {
+    if (name === 'scape_observe') return structuredClone(f.context.observation);
+    if (name === 'scape_place_object') {
+      assert.equal(args.sceneRevision, f.context.observation.scene.sceneRevision);
+      return {
+        ok: true,
+        operationId: String(++placed),
+        sceneRevision: ++f.context.observation.scene.sceneRevision,
+      };
+    }
+    return call(name, args);
+  };
+  await f.turn([{ type: 'speech', player: f.speech('Scout, build a large structure') }]);
+  assert.equal(modelCalls, 1);
+  for (let i = 0; i < 300; i++) {
+    await f.turn();
+    f.advance(700);
+  }
+  assert.equal(placed, 300);
+  assert.equal(result.status, 'complete');
+  assert.equal(result.completed, 300);
+  assert.equal(modelCalls, 2);
 });

@@ -3,7 +3,8 @@ const actions = {
   ignore:
     'No response needed; this is addressed to someone else, quoted, already handled, or unrelated.',
   reply:
-    'A conversational reply is needed, including explaining unavailable mechanics. Requests to break, destroy, build or modify objects require a reply, not an interaction.',
+    'A conversational reply is needed, including explaining unavailable mechanics. Unsupported editing requests require an explanation. Use edit for explicit placement/removal requests only when state.capabilities.worldEditing is true.',
+  edit: 'The speaker requests building a structure, maze, musical arrangement, decorating, or explicitly placing or removing objects and state.capabilities.worldEditing is true. The conversation policy must check live object permissions and use the editing tools.',
   express:
     'The speaker requests an expression available in state.expressions. Let the conversation policy choose the registered expression tool.',
   approach: 'The speaker explicitly asks this agent to come closer to them.',
@@ -17,7 +18,7 @@ const actions = {
   visit:
     'The speaker explicitly asks this agent to visit or inspect an observed object without using it.',
   interact:
-    'The speaker explicitly requests the documented behavior of an observed object: play a piano, ride a conveyor, travel through a paired portal or basement entrance/exit. Breaking, damaging, painting, editing and ordinary entry-door manipulation are unavailable; choose reply for those requests.',
+    'The speaker explicitly requests the documented behavior of an observed object: play a piano, ride a conveyor, travel through a paired portal or basement entrance/exit. Breaking, damaging and painting are unavailable. Placement/removal uses edit when worldEditing is true; otherwise choose reply.',
 };
 
 /** Build bounded references from public observations; adapters receive no credentials or tool handles. */
@@ -108,7 +109,8 @@ export async function perceiveSocialTurn({
   );
   const state = {
     capabilities: {
-      worldEditing: false,
+      worldEditing: observation.scene?.editCapabilities?.canPlace === true,
+      editing: observation.scene?.editCapabilities,
       objectInteractions: [
         'piano',
         'conveyor',
@@ -156,6 +158,7 @@ export async function perceiveSocialTurn({
       let action = answer.choice;
       const acts = [
         'express',
+        'edit',
         'approach',
         'follow',
         'visit',

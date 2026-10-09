@@ -10,13 +10,12 @@ the checkout root. Inside examples/gizmos/<name>, run:
     npm test
     npm exec -- scape gizmo dev
 
-Gizmo development connects to https://scape.wtf by default; pass --origin only
-for another compatible host. Compare the printed code in the developer sidebar's
+Gizmo development connects to https://scape.wtf. Compare the printed code in the developer sidebar's
 Gizmos tab and choose Connect project. The project's npm run dev script is a
 shortcut for scape gizmo dev.
 
 To make an independent copy, copy an example directory outside this checkout,
 run npm install there, then use the same build, test and development commands.
-The public CLI's gizmo init creates a blank project without a --template option.
+Use scape gizmo init to create a blank project.
 
 These examples contain no credentials and do not connect during installation or builds.

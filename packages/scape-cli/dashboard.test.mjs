@@ -105,3 +105,27 @@ test('output is sanitized, bounded and responds to terminal resize', async () =>
   f.view.close();
   f.input.destroy();
 });
+
+test('FR-181: bounded task windows retain full totals and original step numbers', async () => {
+  const f = fixture();
+  try {
+    f.key('2');
+    f.view.event({
+      type: 'tasks',
+      tasks: [
+        {
+          status: 'running',
+          completed: 300,
+          total: 400,
+          steps: [{ action: 'place', label: 'Brick at 12,20', index: 300, status: 'pending' }],
+        },
+      ],
+    });
+    await frame();
+    assert.match(f.text, /300\/400 steps/);
+    assert.match(f.text, /301\. place Brick at 12,20/);
+  } finally {
+    f.view.close();
+    f.input.destroy();
+  }
+});

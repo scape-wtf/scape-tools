@@ -190,15 +190,43 @@ export function createObjectGoals({ context, now, call, canStand }) {
         await cancel();
         throw fail('target_unreachable');
       }
+      if (current.ridingPiano) {
+        if (state.self?.x !== current.entry.x || state.self?.y !== current.entry.y)
+          current.started = true;
+        if (current.started && !state.interacting) {
+          goal = undefined;
+          mark(current.requested);
+        }
+        return true;
+      }
+      if (current.playing) {
+        // A piano interaction is movement onto the key. Acceptance is not a
+        // played note; wait for its confirmed position before the next score step.
+        if (state.self?.x === object.x && state.self?.y === object.y && !state.interacting) {
+          goal = undefined;
+          mark(current.requested);
+          return true;
+        }
+        return true;
+      }
       if (
         distance(state.self, { ...object, floor: object.floor ?? current.floor }) === 1 &&
         state.movement?.status !== 'moving'
       ) {
-        goal = undefined;
         if (current.use) {
           if (!usable(object, state.scene)) throw fail('interaction_unavailable');
+          const entry = { x: state.self.x, y: state.self.y };
           await call('scape_interact', { target: object.id }, tools);
+          if (goal !== current) return false;
+          if (object.emoji === '🎹') {
+            if (conveyor(object)) {
+              current.ridingPiano = true;
+              current.entry = entry;
+            } else current.playing = true;
+            return true;
+          }
         }
+        goal = undefined;
         mark(current.requested);
         inspectUntil = now() + 3000;
         return true;

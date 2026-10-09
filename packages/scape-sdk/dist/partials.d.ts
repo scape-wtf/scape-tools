@@ -56,5 +56,5 @@ export interface GizmoPartialsSound {
     tailFade?: number;
 }
 export declare function gizmoPartialsError(value: unknown, path?: string): string | null;
-/** Deterministic PCM only. Hosts render this in a worker, with their normal time/cache budgets. */
+/** Render deterministic PCM samples for local audio tests. */
 export declare function renderGizmoPartials(sound: GizmoPartialsSound, rate?: number): GizmoSoundSamples;

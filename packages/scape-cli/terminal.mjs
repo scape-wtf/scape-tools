@@ -355,8 +355,32 @@ export function terminal({
       line(title);
       line('────────────────────────────', 'muted');
     },
+    link(value) {
+      const url = new URL(clean(value));
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+        throw new Error('Browser links must use HTTP or HTTPS.');
+      }
+      const href = url.href;
+      line();
+      line('Open in your browser', 'focus');
+      line('─'.repeat(Math.min(width(), 64)), 'focus');
+      // Keep the URL intact so narrow terminals can wrap it without breaking copying.
+      // OSC 8 makes the full address clickable in terminals that support hyperlinks.
+      const link = color
+        ? `\x1b]8;;${href}\x1b\\\x1b[1;4;38;2;${palette.focus}m${href}\x1b[0m\x1b]8;;\x1b\\`
+        : href;
+      output.write(`  ${link}\n`);
+      line('─'.repeat(Math.min(width(), 64)), 'focus');
+      line('Cmd/Ctrl-click to open, or copy the URL into your browser.', 'muted');
+      line();
+    },
     code(value) {
-      const text = `  ${clean(value)}  `,
+      const grouped =
+        clean(value)
+          .replace(/\s/g, '')
+          .match(/.{1,4}/g)
+          ?.join(' ') ?? '';
+      const text = `  ${grouped}  `,
         size = Math.max(24, [...text].length);
       line(`╭${'─'.repeat(size)}╮`, 'muted');
       line(`│${text.padEnd(size)}│`, 'primary');

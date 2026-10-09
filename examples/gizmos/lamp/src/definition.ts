@@ -26,7 +26,42 @@ export const lamp = defineObject<LampState>({
     typeof state.on === 'boolean' &&
     typeof state.color === 'string' &&
     Object.prototype.hasOwnProperty.call(colors, state.color),
+  inputs: {
+    toggle: { label: 'Toggle', phrase: 'toggle', kind: 'event', action: 'toggle' },
+    on: {
+      label: 'Turn on',
+      phrase: 'turn on',
+      kind: 'event',
+      action: 'power',
+      payload: { on: true },
+    },
+    off: {
+      label: 'Turn off',
+      phrase: 'turn off',
+      kind: 'event',
+      action: 'power',
+      payload: { on: false },
+    },
+    power: {
+      label: 'Power',
+      kind: 'boolean',
+      action: 'power',
+      value: 'on',
+      combine: 'any',
+      locks: ['toggle', 'power'],
+    },
+  },
+  outputs: { power: { label: 'Power', kind: 'boolean' } },
+  signals: state => ({ power: state.on }),
   actions: {
+    power: {
+      permission: 'participant',
+      run: (state, payload) => {
+        requirePayload(payload, ['on']);
+        if (typeof payload.on !== 'boolean') throw new ObjectActionError(400, 'Choose on or off.');
+        return { ...state, on: payload.on };
+      },
+    },
     toggle: {
       permission: 'participant',
       run: (state, payload) => {

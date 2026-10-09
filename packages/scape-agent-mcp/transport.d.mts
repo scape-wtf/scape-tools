@@ -9,7 +9,14 @@ export class ScapeAgent {
   pair(name: string): Promise<{ code: string; expiresAt: number }>;
   pairingStatus(): Promise<
     | { approved: false; expiresAt: number }
-    | { approved: true; agentId: string; room: string; name: string; expiresAt: number }
+    | {
+        approved: true;
+        agentId: string;
+        room: string;
+        name: string;
+        expiresAt: number;
+        editing: boolean;
+      }
   >;
   enter(): Promise<Observation>;
   observe(): Promise<Observation>;

@@ -11,6 +11,8 @@ const actions = new Set([
   'scape_expression',
   'scape_follow',
   'scape_approach',
+  'scape_place_object',
+  'scape_remove_object',
 ]);
 const lifecycle = new Set(['scape_pair', 'scape_enter', 'scape_leave']);
 
@@ -174,7 +176,11 @@ export async function runAgentSession({
         }
         // Stop all decisions immediately on transport/access loss. The owner
         // runner may re-enter only after checking the current grant again.
-        if (connectionFailure(error) || [401, 403].includes(error.status)) fail(error);
+        const rejectedEdit =
+          ['scape_place_object', 'scape_remove_object'].includes(name) &&
+          ['editing_not_granted', 'edit_forbidden'].includes(error.code);
+        if (connectionFailure(error) || ([401, 403].includes(error.status) && !rejectedEdit))
+          fail(error);
         throw error;
       }
     },

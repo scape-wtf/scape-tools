@@ -1,4 +1,10 @@
 import {
+  validGizmoConnections,
+  validateGizmoConnections,
+  resolveGizmoSignals,
+  type GizmoSignals,
+} from './connections.js';
+import {
   validGizmoWorldEditor,
   validGizmoWorldDestination,
   resolveGizmoNavigation,
@@ -36,8 +42,23 @@ export const OBJECT_STATE_BYTE_LIMIT = 32_768;
 export function isObjectEnvelope(value: unknown): value is ObjectInstance {
   if (
     !record(value) ||
-    !exactKeys(value, ['id', 'type', 'version', 'state', 'linkId']) ||
+    !exactKeys(value, [
+      'id',
+      'type',
+      'version',
+      'state',
+      'linkId',
+      'connections',
+      'signalInputs',
+    ]) ||
     !objectId(value.id) ||
+    (value.signalInputs !== undefined &&
+      (!record(value.signalInputs) ||
+        Object.keys(value.signalInputs).length > 8 ||
+        Object.entries(value.signalInputs).some(
+          ([id, v]) => !/^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/.test(id) || typeof v !== 'boolean',
+        ))) ||
+    (value.connections !== undefined && !validGizmoConnections(value.connections)) ||
     typeof value.type !== 'string' ||
     !/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(value.type) ||
     value.type.length > 80 ||
@@ -67,7 +88,7 @@ export function isObjectConfiguration(value: unknown): value is ObjectConfigurat
     new TextEncoder().encode(JSON.stringify(value.values)).byteLength <= 2048
   );
 }
-/** A disabled trusted definition, retained for host diagnostics without touching saved state. */
+/** A disabled definition and its validation error; saved state is unchanged. */
 export interface GizmoFailure {
   type: string;
   emoji: string;
@@ -133,6 +154,8 @@ function validateDefinition(definition: ObjectDefinition): void {
         ))
     )
       throw new Error('Invalid local previews');
+    field = 'connections';
+    validateGizmoConnections(definition);
     field = 'initial';
     const state = definition.initial();
     if (
@@ -147,6 +170,7 @@ function validateDefinition(definition: ObjectDefinition): void {
     field = 'valid';
     if (definition.valid(structuredClone(state)) !== true)
       throw new Error('Invalid initial gizmo state');
+    resolveGizmoSignals(definition, state);
     field = 'view';
     if (definition.view) {
       for (const canEdit of [false, true]) {
@@ -315,7 +339,7 @@ export class ObjectRegistry {
   private definitions = new Map<string, ObjectDefinition>();
   private emojis = new Map<string, ObjectDefinition>();
   private disabled: GizmoFailure[] = [];
-  /** Isolation is for trusted bundled catalogs only. Uploaded projects must remain atomic. */
+  /** By default, any invalid definition rejects registration. Optional isolation records failures locally; uploads always validate the whole project. */
   constructor(
     definitions: readonly ObjectDefinition[],
     options: { isolateInvalidDefinitions?: boolean } = {},
@@ -348,14 +372,14 @@ export class ObjectRegistry {
       message: error instanceof Error ? error.message : String(error),
     });
   }
-  /** Host preparation may reject one model without revalidating unrelated definitions. */
+  /** Disable a definition in this registry and record the reason. */
   disable(definition: ObjectDefinition, message: string): void {
     if (this.definitions.get(definition.type) !== definition) return;
     this.definitions.delete(definition.type);
     this.emojis.delete(definition.emoji);
     this.recordFailure(definition, new Error(`${definition.type}: ${message}`));
   }
-  /** Atomically install a complete catalog while preserving host references. */
+  /** Replace registered definitions atomically. */
   reset(definitions: readonly ObjectDefinition[]): void {
     const next = new ObjectRegistry(definitions);
     this.definitions = next.definitions;
@@ -364,7 +388,7 @@ export class ObjectRegistry {
       failure => !next.definitions.has(failure.type) && !next.emojis.has(failure.emoji),
     );
   }
-  /** A separate host catalog keeps unavailable built-ins and their placement guard. */
+  /** Copy the registry with additional definitions, preserving disabled definitions. */
   fork(additional: readonly ObjectDefinition[] = []): ObjectRegistry {
     for (const definition of additional) {
       if (
@@ -449,7 +473,7 @@ export class ObjectRegistry {
       throw new ObjectActionError(400, 'Invalid gizmo configuration');
     return configuration;
   }
-  /** Restore portable values through the normal reducer and host-derived editing authority. */
+  /** Restore portable values through the declared reducer and supplied editing permission. */
   configure(
     instance: ObjectInstance,
     configuration: unknown,
@@ -515,7 +539,7 @@ export class ObjectRegistry {
     instance: ObjectInstance,
     action: ObjectAction,
     context: ObjectContext,
-  ): { instance: ObjectInstance; reaction: GizmoReaction | null } {
+  ): { instance: ObjectInstance; reaction: GizmoReaction | null; signals: GizmoSignals } {
     if (!this.validate(instance)) throw new ObjectActionError(400, 'Invalid gizmo state');
     if (
       !record(action) ||
@@ -566,6 +590,7 @@ export class ObjectRegistry {
     }
     return {
       instance: next,
+      signals: resolveGizmoSignals(definition, next.state, instance.state, action),
       reaction: resolveGizmoReaction(definition, next.state, instance.state, action, context.now),
     };
   }

@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { providerJSON, providerFailure, providerFailureMessage } from './provider-http.mjs';
 import { usable } from './world-goals.mjs';
 import { createRuntimeLogger } from './runtime-logging.mjs';
+import { TaskPlanError } from './task-plans.mjs';
 import {
   reviewInstructions,
   reviewQuestions,
@@ -12,6 +13,7 @@ import {
   activityEvidence,
   actionEvidence,
   repairInstructions,
+  compactReviewState,
 } from './reply-review.mjs';
 
 // Only world tools are offered. Pairing and entry are owner-controlled, not model decisions.
@@ -50,7 +52,7 @@ Speak using scape_speak; ordinary assistant prose is private and will not appear
 Address the current replyTarget. Casual greetings and small talk deserve natural conversation in your configured character voice; they do not require a task, physical evidence or a clarification question. Old bubbles and prior dialogue are background.
 Your activity is established by current activityEvidence and confirmed tool results. Nearby objects are surroundings, not actions you have taken. A personality such as playful or troublesome does not establish that you are using an object. Answer questions about what you are doing from actual activity; conversation itself is a valid answer when no physical activity is confirmed. Never invent activity to make a reply more colorful.
 Use the current confirmed position and observed player/object IDs. Movement acceptance is not arrival: check observations. Use follow/approach for player targets and the handbook for mechanics. You can explore and converse using these same tools.
-Capabilities describe possible mechanics, not the current inventory. Propose a specific object action only when the current observation contains that object; otherwise make the suggestion conditional on finding one. Do not invent a piano from examples in these instructions. Capabilities are bounded by the offered tools. Scape world objects cannot be broken, damaged, edited or made to produce invented effects with these tools. Ordinary entry doors are not supported interaction targets. Do not propose unsupported mechanics as a next step. If you previously offered something unsupported and the player accepts (for example, "you go first"), acknowledge that you got carried away and state the limitation in character; offer a supported alternative without pretending it happened. Preserve playful banter, but distinguish imagination from actual world actions.
+Capabilities describe possible mechanics, not the current inventory. Propose a specific object action only when the current observation contains that object; otherwise make the suggestion conditional on finding one. Do not invent a piano from examples in these instructions. Capabilities are bounded by the offered tools. Scenery editing is disabled. You cannot place, remove, build or configure world objects. You can still move and use existing supported objects. Ordinary entry doors are not supported interaction targets. Do not propose unsupported mechanics as a next step. If you previously offered something unsupported and the player accepts (for example, "you go first"), acknowledge that you got carried away and state the limitation in character; offer a supported alternative without pretending it happened. Preserve playful banter, but distinguish imagination from actual world actions.
 Respect stops, departures and requests for space. You have no file, shell, wallet or account tools. Never claim to have done an action without confirmation. Use scape_leave to end participation when appropriate.
 The runtime keeps listening after you finish a turn. Existing bubbles on entry are context, not new messages. Current activity and observations are supplied as JSON data.
 Finish the turn when your reply or requested action is complete. Do not poll observe repeatedly, issue wait/stop to end a turn, or clear a reply just to go idle. The runtime handles listening, thinking indication and speech expiry; scape_stop also clears visible speech. Use stop or quiet controls only when actually requested or needed to interrupt an action.
@@ -213,7 +215,7 @@ export function createModelPolicy({
       allowed.has(name),
     ),
     expressions: allowed.has('scape_expression'),
-    worldEditing: false,
+    editingTools: allowed.has('scape_place_object') && allowed.has('scape_remove_object'),
     sessionDialogue: true,
     persistentNotes: config.memory?.conversationNotes === true,
     objectInteractions: allowed.has('scape_interact')
@@ -222,6 +224,9 @@ export function createModelPolicy({
   };
   const observedCapabilities = observation => ({
     ...capabilities,
+    worldEditing:
+      capabilities.editingTools && observation?.scene?.editCapabilities?.canPlace === true,
+    editing: observation?.scene?.editCapabilities,
     inventoryObserved: Array.isArray(observation?.scene?.objects),
     usableObjects: allowed.has('scape_interact')
       ? (observation?.scene?.objects ?? [])
@@ -317,7 +322,7 @@ export function createModelPolicy({
     },
   };
   const checkDraft = async (state, signal) => {
-    state = { ...state, capabilities: observedCapabilities(state.observation) };
+    state = compactReviewState({ ...state, capabilities: observedCapabilities(state.observation) });
     const report = async (source, accepted, fields) => {
       try {
         await onReplyTrace({
@@ -489,7 +494,15 @@ export function createModelPolicy({
                 )
               : planning
                 ? tools.filter(tool =>
-                    ['agent_task', 'scape_speak', 'scape_guide'].includes(tool.name),
+                    [
+                      'agent_task',
+                      'scape_speak',
+                      'scape_guide',
+                      'scape_object_catalog',
+                      'scape_observe',
+                      'scape_place_object',
+                      'scape_remove_object',
+                    ].includes(tool.name),
                   )
                 : tools;
         let rejectedDrafts = 0,
@@ -631,6 +644,7 @@ export function createModelPolicy({
             signal.throwIfAborted();
             if (typeof call.id !== 'string' || !call.id) throw providerFailure('invalid_response');
             let value,
+              args,
               error = false;
             try {
               if (!allowed.has(call.name) || !turnTools.some(tool => tool.name === call.name))
@@ -639,7 +653,7 @@ export function createModelPolicy({
                 throw Object.assign(new Error(actionErrors.clarification_required), {
                   code: 'clarification_required',
                 });
-              const args = correcting
+              args = correcting
                 ? correctionArgs
                 : typeof call.args === 'string'
                   ? JSON.parse(call.args)
@@ -783,6 +797,17 @@ export function createModelPolicy({
               }
             } catch (cause) {
               signal.throwIfAborted();
+              if (call.name === 'agent_task') {
+                try {
+                  await onReplyTrace({
+                    turn: turnNumber,
+                    source: 'task_validation',
+                    args,
+                    code: cause?.code,
+                    message: cause?.message,
+                  });
+                } catch {}
+              }
               diagnostic('tool_call', {
                 turn: turnNumber,
                 tool: toolCategory(call.name),
@@ -792,9 +817,12 @@ export function createModelPolicy({
               });
               error = true;
               value = {
-                error: Object.hasOwn(actionErrors, cause?.code)
-                  ? actionErrors[cause.code]
-                  : 'Scape action failed. Inspect the current observation and correct the request.',
+                error:
+                  cause instanceof TaskPlanError
+                    ? cause.message
+                    : Object.hasOwn(actionErrors, cause?.code)
+                      ? actionErrors[cause.code]
+                      : 'Scape action failed. Inspect the current observation and correct the request.',
                 ...(typeof cause?.code === 'string' ? { code: cause.code } : {}),
               };
             }

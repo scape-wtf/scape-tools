@@ -82,6 +82,28 @@ export function activityEvidence(observation) {
   };
 }
 
+// Review needs evidence once, not repeated scene inventories and social copies.
+// Keep all task outcomes and action details; only discard duplicate representations
+// and edit-replay handles, which never prove a conversational claim.
+export function compactReviewState(state) {
+  const observation = { ...state.observation };
+  if (observation.scene) {
+    observation.scene = {
+      ...observation.scene,
+      objects: observation.scene.objects?.map(({ editTarget, ...object }) => object),
+    };
+    delete observation.objects;
+    delete observation.blocked;
+  }
+  const events = state.events?.flatMap(event => {
+    if (event === state.target?.outcome) return [];
+    if (event.type !== 'social') return [event];
+    const { recentActions, ...social } = event;
+    return [social];
+  });
+  return { ...state, observation, events };
+}
+
 // Review history is evidence, not a replay of provider messages. Whole old world
 // snapshots and private drafts inflate JEV's token count and can imply speech
 // that was never published. Retain only acknowledged tools, with explicit omissions.
@@ -111,7 +133,11 @@ export function reviewHistoryTurn(target, evidence) {
 export function actionEvidence(actions, observation) {
   return actions.map(action => {
     if (action.targetObject) return action;
-    const object = observation.scene?.objects?.find(object => object.id === action.args?.target);
+    const object =
+      action.args?.target &&
+      observation.scene?.objects?.find(
+        object => object.id === action.args.target || object.editTarget === action.args.target,
+      );
     return {
       ...action,
       ...(object
