@@ -7,7 +7,10 @@ export const counter = defineObject<{ count: number }>({
   version: 1,
   emoji: '🔢',
   label: 'Counter',
-  hint: 'count together',
+  hint: 'Bump to add one',
+  interaction: { bump: { name: 'increment', payload: {} } },
+  react: (state, _previous, action) =>
+    action.name === 'increment' ? { feedback: { durationMs: 900, number: state.count } } : null,
   initial: () => ({ count: 0 }),
   valid: (state): state is { count: number } =>
     record(state) &&
@@ -35,14 +38,8 @@ export const counter = defineObject<{ count: number }>({
   },
   view: (state, viewer) => ({
     title: `${state.count}`,
-    description: 'Everyone can add one. The object editor can reset the count.',
+    description: 'Bump into the counter to add one. The object editor can reset the count.',
     controls: [
-      {
-        id: 'increment',
-        label: 'Add one',
-        action: { name: 'increment', payload: {} },
-        disabled: state.count === 9999,
-      },
       ...(viewer.canEdit
         ? [
             {

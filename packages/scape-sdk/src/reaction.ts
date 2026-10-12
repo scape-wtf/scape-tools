@@ -13,11 +13,17 @@ import { resolveGizmoSounds } from './soundBank.js';
 /** Bounded, short-lived cosmetics anchored by the host to an accepted action. */
 export interface GizmoFeedback {
   durationMs: number;
+  /** A shared, animated positive result number, shown once per accepted event. */
+  number?: number;
   audio?: GizmoAudioCommand[];
+  /** Replace named voices on this placed object, or overlap separate accepted events (default). */
+  audioMode?: 'overlap' | 'replace';
   lighting?: GizmoLightingState;
   /** Only the initiating player receives this optional device feedback. */
   haptic?: 'light' | 'heavy';
   cameraShake?: { strength: number; durationMs: number };
+  /** Restart the burst on this placed object, or overlap accepted bursts (default). */
+  burstMode?: 'overlap' | 'replace';
   burst?: {
     color: string;
     radiusCells: number;
@@ -27,6 +33,47 @@ export interface GizmoFeedback {
   };
   impulse?: { scale: number; rotation: number; durationMs?: number };
 }
+/** Explicit, state-independent contact cosmetics for a participant tap/bump action.
+ * This is feedback for an attempt, not proof that the action succeeded.
+ */
+export type GizmoInteractionFeedback = Pick<
+  GizmoFeedback,
+  'durationMs' | 'audio' | 'audioMode' | 'burst' | 'burstMode'
+>;
+
+export function validateGizmoInteractionFeedback(
+  definition: ObjectDefinition,
+  sounds: GizmoSounds,
+): void {
+  const entries = definition.interactionFeedback;
+  if (entries === undefined) return;
+  if (
+    !record(entries) ||
+    Object.keys(entries).length > 32 ||
+    !jsonData(entries) ||
+    JSON.stringify(entries).length > 16384
+  )
+    throw new ObjectActionError(400, 'Invalid interaction feedback');
+  for (const [name, feedback] of Object.entries(entries)) {
+    if (
+      !Object.hasOwn(definition.actions, name) ||
+      definition.actions[name].permission !== 'participant' ||
+      !Object.values(definition.interaction ?? {}).some(action => action.name === name) ||
+      !record(feedback) ||
+      !exactKeys(feedback, ['durationMs', 'audio', 'audioMode', 'burst', 'burstMode']) ||
+      (!feedback.audio && !feedback.burst) ||
+      (feedback.audio !== undefined &&
+        (!Array.isArray(feedback.audio) || !feedback.audio.length)) ||
+      gizmoFeedbackError(feedback, sounds) ||
+      feedback.audio?.some(command => command.delayMs !== 0)
+    )
+      throw new ObjectActionError(
+        400,
+        'Interaction feedback requires a participant interaction and immediate, bounded audio or burst',
+      );
+  }
+}
+
 /** Requests are evaluated atomically by the host, which retains removal authority. */
 export interface GizmoReaction {
   feedback?: GizmoFeedback;
@@ -63,11 +110,14 @@ export function gizmoFeedbackError(value: unknown, sounds: GizmoSounds): string 
     !exactKeys(value, [
       'durationMs',
       'audio',
+      'audioMode',
       'lighting',
       'haptic',
       'cameraShake',
       'burst',
+      'burstMode',
       'impulse',
+      'number',
     ]) ||
     !jsonData(value) ||
     JSON.stringify(value).length > 16384
@@ -75,6 +125,23 @@ export function gizmoFeedbackError(value: unknown, sounds: GizmoSounds): string 
     return 'Invalid action feedback';
   if (typeof value.durationMs !== 'number' || value.durationMs < 1 || value.durationMs > 2000)
     return 'Feedback duration must be 1–2000 ms';
+  if (
+    value.number !== undefined &&
+    (!Number.isSafeInteger(value.number) ||
+      Number(value.number) < 1 ||
+      Number(value.number) > 1000000)
+  )
+    return 'Feedback number must be a positive integer up to 1000000';
+  if (
+    value.audioMode !== undefined &&
+    (!value.audio || !['overlap', 'replace'].includes(String(value.audioMode)))
+  )
+    return 'Invalid feedback audio mode';
+  if (
+    value.burstMode !== undefined &&
+    (!value.burst || !['overlap', 'replace'].includes(String(value.burstMode)))
+  )
+    return 'Invalid feedback burst mode';
   if (value.audio !== undefined) {
     const error = gizmoAudioError({ key: 'reaction', at: 0, commands: value.audio }, sounds);
     if (error) return error;

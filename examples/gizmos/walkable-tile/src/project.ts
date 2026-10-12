@@ -2,4 +2,8 @@
 import { defineProject } from '@scape-wtf/sdk';
 import { walkableTile } from './definition.js';
 
-export default defineProject({ objects: [walkableTile] });
+export default defineProject({
+  name: 'Walkable tile',
+  description: 'Place a simple floor tile that players can walk across.',
+  objects: [walkableTile],
+});

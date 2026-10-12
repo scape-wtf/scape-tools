@@ -43,7 +43,19 @@ export function localObjectRandomInt(min, max) {
     } while (value[0] >= limit);
     return min + (value[0] % range);
 }
+/** Project copy uses the same bounds in the authoring SDK, sandbox and shop. */
+export function validProjectMetadata(value) {
+    return (record(value) &&
+        typeof value.name === 'string' &&
+        value.name.trim().length >= 1 &&
+        value.name.length <= 80 &&
+        typeof value.description === 'string' &&
+        value.description.trim().length >= 10 &&
+        value.description.length <= 1000);
+}
 export const PROJECT_OBJECT_LIMIT = 16;
 export function defineProject(project) {
+    if (!validProjectMetadata(project))
+        throw new ObjectActionError(400, 'Provide a project name (1–80 characters) and description (10–1000 characters).');
     return project;
 }

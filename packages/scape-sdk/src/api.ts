@@ -1,8 +1,14 @@
 import type { ActionButton } from './actionButtons.js';
+import type { GizmoWebView } from './web.js';
 import type { GizmoConnection, GizmoInput, GizmoOutput, GizmoSignals } from './connections.js';
 import type { GizmoNavigation, GizmoWorldEditor } from './navigation.js';
 import type { GizmoLink, GizmoTravel, GizmoEnvironment } from './travel.js';
-import type { GizmoInteraction, GizmoReaction, GizmoReactionContext } from './reaction.js';
+import type {
+  GizmoInteraction,
+  GizmoInteractionFeedback,
+  GizmoReaction,
+  GizmoReactionContext,
+} from './reaction.js';
 import type { GizmoSpriteRecipe } from './sprite.js';
 import type { GizmoConfiguration } from './configuration.js';
 import type { GizmoPreview } from './soundBank.js';
@@ -106,6 +112,8 @@ export type ObjectField =
   | { id: string; label: string; value: string; kind: 'select'; options: ObjectChoice[] };
 /** Declarative editor content rendered inside Scape's shared popover. */
 export interface ObjectView {
+  /** Optional isolated website or static HTML rendered by the host in this popover. */
+  web?: GizmoWebView;
   /** Visible panel title. */
   title: string;
   /** Supporting description for the current state or controls. */
@@ -143,6 +151,8 @@ export interface ObjectDefinition {
   outputs?: Record<string, GizmoOutput>;
   signals?: (state: unknown, previous: unknown, action: ObjectAction | null) => GizmoSignals;
   interaction?: GizmoInteraction;
+  /** Immediate local contact audio/bursts, keyed by participant tap/bump action name. */
+  interactionFeedback?: Record<string, GizmoInteractionFeedback>;
   areaRemoval?: { radiusCells: number };
   react?: (
     state: unknown,
@@ -302,9 +312,34 @@ export function localObjectRandomInt(min: number, max: number): number {
 
 /** One atomic development build. Object state remains independent per placed instance. */
 export interface ProjectDefinition {
+  /** Public product title. */
+  name: string;
+  /** Public product description, captured with each release. Required for shop submission. */
+  description: string;
   objects: readonly ObjectDefinition[];
+}
+export interface ProjectMetadata {
+  name: string;
+  description: string;
+}
+/** Project copy uses the same bounds in the authoring SDK, sandbox and shop. */
+export function validProjectMetadata(value: unknown): value is ProjectMetadata {
+  return (
+    record(value) &&
+    typeof value.name === 'string' &&
+    value.name.trim().length >= 1 &&
+    value.name.length <= 80 &&
+    typeof value.description === 'string' &&
+    value.description.trim().length >= 10 &&
+    value.description.length <= 1000
+  );
 }
 export const PROJECT_OBJECT_LIMIT = 16;
 export function defineProject(project: ProjectDefinition): ProjectDefinition {
+  if (!validProjectMetadata(project))
+    throw new ObjectActionError(
+      400,
+      'Provide a project name (1–80 characters) and description (10–1000 characters).',
+    );
   return project;
 }

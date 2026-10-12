@@ -10,7 +10,12 @@ import {
   resolveGizmoNavigation,
 } from './navigation.js';
 import { validGizmoLink, resolveGizmoTravel } from './travel.js';
-import { resolveGizmoReaction, validGizmoInteraction, type GizmoReaction } from './reaction.js';
+import {
+  resolveGizmoReaction,
+  validGizmoInteraction,
+  validateGizmoInteractionFeedback,
+  type GizmoReaction,
+} from './reaction.js';
 import { resolveGizmoSprite } from './sprite.js';
 import { validGizmoConfiguration } from './configuration.js';
 import { resolveGizmoSounds, gizmoPreviewError, type GizmoPreview } from './soundBank.js';
@@ -192,6 +197,8 @@ function validateDefinition(definition: ObjectDefinition): void {
     )
       throw new Error('Use a soundBank callback without static sounds or ambience');
     const sounds = resolveGizmoSounds(definition, state);
+    field = 'interactionFeedback';
+    validateGizmoInteractionFeedback(definition, sounds);
     field = 'audio';
     if (definition.audio) {
       const error = gizmoAudioError(
@@ -577,7 +584,7 @@ export class ObjectRegistry {
           !validGizmoWorldDestination(next.state[definition.worldEditor.field])))
     )
       throw new ObjectActionError(400, 'Invalid world destination');
-    resolveGizmoSounds(definition, next.state);
+    validateGizmoInteractionFeedback(definition, resolveGizmoSounds(definition, next.state));
     resolveGizmoSprite(definition, next.state);
     validateGizmoSteps(definition, next.state);
     if (definition.audio) {

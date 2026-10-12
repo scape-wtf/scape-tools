@@ -1,5 +1,6 @@
 import { type ObjectDefinition } from './api.js';
 import { type GizmoFeedback } from './reaction.js';
+import { type GizmoCharacterMotion } from './characterMotion.js';
 /** Host-created groups are scoped to a definition/version and floor. Independent of travel. */
 export interface GizmoLink {
     size: 2;
@@ -22,6 +23,10 @@ export interface GizmoTravel {
     /** Rotate offsets so +X follows the entering player's direction. */
     relative?: boolean;
     cooldownMs: number;
+    /** Activate after stepping or landing onto this source, instead of before entry. Requires non-relative exits. */
+    activateOnArrival?: boolean;
+    /** Animate the character along the authorized path, with authored transforms. */
+    motion?: GizmoCharacterMotion;
     feedback?: Pick<GizmoFeedback, 'durationMs' | 'audio' | 'haptic'>;
     /** Optional local-player arrival cosmetics; collision and camera remain host-owned. */
     arrival?: {

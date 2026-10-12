@@ -53,7 +53,7 @@ test('namespaced initialization and its alias scaffold the same project without 
     const result = run([...prefix, destination]);
     assert.equal(result.status, 0, result.stderr);
     const manifest = JSON.parse(await readFile(path.join(destination, 'package.json'), 'utf8'));
-    assert.equal(manifest.dependencies['@scape-wtf/sdk'], '0.1.2');
+    assert.equal(manifest.dependencies['@scape-wtf/sdk'], '0.2.0');
     const cliManifest = JSON.parse(
       await readFile(new URL('./package.json', import.meta.url), 'utf8'),
     );

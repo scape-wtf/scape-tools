@@ -102,7 +102,7 @@ export async function initAgentProject(destination, options = {}) {
           '@scape-wtf/cli': 'file:vendor/scape-cli.tgz',
           '@scape-wtf/agent-mcp': 'file:vendor/scape-agent-mcp.tgz',
         }
-      : { '@scape-wtf/cli': '0.1.5', '@scape-wtf/agent-mcp': '0.1.4' };
+      : { '@scape-wtf/cli': '0.1.6', '@scape-wtf/agent-mcp': '0.1.4' };
   const manifest = {
     name:
       path

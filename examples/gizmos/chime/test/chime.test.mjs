@@ -7,19 +7,28 @@ const registry = new ObjectRegistry([chime]);
 const action = { name: 'ring', payload: {} };
 const listener = { actorId: 'visitor', canEdit: false, now: 1000, randomInt: () => 0 };
 
-test('accepted rings carry feedback and a 250 ms cooldown', () => {
+test('bumps declare immediate replacing rings and still accept each action', () => {
   const initial = registry.create('🛎️', 'chime-example-instance');
-  const result = registry.execute(initial, action, listener);
-  assert.deepEqual(result.instance.state, { lastAt: 1000 });
-  assert.equal(result.reaction.feedback.audio[0].sound, 'ring');
-  assert.equal(result.reaction.feedback.durationMs, 600);
-  assert.throws(
-    () => registry.execute(result.instance, action, { ...listener, now: 1249 }),
-    /Let the chime ring/,
-  );
-  assert.equal(
-    registry.execute(result.instance, action, { ...listener, now: 1250 }).instance.state.lastAt,
-    1250,
-  );
-  assert.equal(chime.view(initial.state, listener).controls[0].placement, 'action');
+  assert.deepEqual(chime.interaction.bump, action);
+  assert.equal(chime.view, undefined);
+  assert.equal(chime.interactionFeedback.ring.audioMode, 'replace');
+  assert.equal(chime.interactionFeedback.ring.burstMode, 'replace');
+  assert.deepEqual(chime.interactionFeedback.ring.burst, {
+    color: '#a9e8ff',
+    radiusCells: 1.5,
+    particles: 0,
+  });
+  assert.equal(chime.interactionFeedback.ring.audio[0].delayMs, 0);
+  let instance = initial;
+  for (const now of [1000, 1000, 1050, 1100]) {
+    const result = registry.execute(instance, action, { ...listener, now });
+    instance = result.instance;
+    assert.deepEqual(instance.state, { lastAt: now });
+    assert.equal(result.reaction.feedback.audio[0].sound, 'ring');
+    assert.equal(result.reaction.feedback.durationMs, 600);
+    assert.deepEqual(result.reaction.feedback.audio, chime.interactionFeedback.ring.audio);
+    assert.equal(result.reaction.feedback.audioMode, 'replace');
+    assert.deepEqual(result.reaction.feedback.burst, chime.interactionFeedback.ring.burst);
+    assert.equal(result.reaction.feedback.burstMode, 'replace');
+  }
 });

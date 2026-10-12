@@ -1,12 +1,12 @@
 # Scape SDK
 
 Gizmos are interactive objects in [scape.wtf](https://scape.wtf). Define them with
-`defineObject` and collect them with `defineProject({ objects: [...] })`.
+`defineObject` and collect them with `defineProject({ name, description, objects: [...] })`.
 
 A dependency-free TypeScript and ESM package for defining Gizmos.
 The standalone starter and CLI require Node 22 or newer.
 
-- `@scape-wtf/sdk`: `defineObject`, `defineProject`, `PROJECT_OBJECT_LIMIT`, typed definitions, state, action context, declarative fields/buttons,
+- `@scape-wtf/sdk`: `defineObject`, `defineProject`, `validProjectMetadata`, `ProjectMetadata`, `PROJECT_OBJECT_LIMIT`, typed definitions, state, action context, declarative fields/buttons,
   validation helpers and `ObjectActionError`.
 - `@scape-wtf/sdk/runtime`: `ObjectRegistry`, `isObjectEnvelope` and `OBJECT_STATE_BYTE_LIMIT`
   for local tests. This entry has no built-in gizmos or game dependencies.
@@ -63,7 +63,7 @@ in the same row before Configure/Delete. Its default icon is `media-play-filled`
 { id: 'ring', label: 'Ring', placement: 'action', action: { name: 'ring', payload: {} } }
 ```
 
-Chime uses this for Ring. Piano uses it with `kind: 'preview'` for Play note,
+Piano uses it with `kind: 'preview'` for Play note,
 which works with Configure open or closed and remains local and editor-only.
 Referenced editor fields remain under Configure; placement does not grant access
 to an action or expose its fields. `trigger: 'change'` cannot also be an action-row
@@ -145,7 +145,30 @@ npm exec -- scape gizmo dev
 
 Approve the printed pairing code in your developer world on scape.wtf. The CLI watches your files and uploads changes. See the [quickstart](https://developer.scape.wtf/gizmos/quickstart).
 
-A project default-exports `defineProject({ objects: [first, second] })`. Scape accepts up to 16 definitions and validates the entire update before activation. Each placed instance has independent state. Types and emojis must be unique; remove placed instances before removing their definition or changing its type, state version or fixed walkability.
+A project default-exports its public name, description and gizmo definitions:
+
+```ts
+export default defineProject({
+  name: 'Lamp',
+  description: 'Light up your world with a switchable lamp.',
+  objects: [lamp],
+});
+```
+
+`ProjectMetadata` contains `name` (1–80 characters) and `description` (10–1000
+characters). `validProjectMetadata(value)` checks these bounds; `defineProject`
+rejects missing, partial or invalid metadata. Every uploaded project must export a
+project with both fields and an `objects` array, even for a single gizmo. Each gizmo retains its own short `label` and
+`hint` for world controls and the palette. Metadata describes the whole project,
+which may contain several gizmos.
+
+Releases capture this copy with the code. The shop displays the selected release's
+name and description; creators enter a gem price when submitting for review.
+Changing product copy requires a new release and approval. Price and authenticated
+creator identity remain shop-owned. Both metadata fields are required for shop
+submissions.
+
+Scape accepts up to 16 definitions and validates the entire update before activation. Each placed instance has independent state. Types and emojis must be unique; remove placed instances before removing their definition or changing its type, state version or fixed walkability.
 
 ## Presentation and effects
 
@@ -337,6 +360,73 @@ See [Chime](https://developer.scape.wtf/examples/gizmos/chime) for a shared sign
 [Bomb](https://developer.scape.wtf/gizmos/reactions) for an independent composition of bump input,
 server timing, shared feedback and area removal.
 
+`feedback.number` displays a positive integer (1–1,000,000) using Scape's animated
+world-number renderer for `durationMs`. Each accepted event has its own label;
+duplicate deliveries do not repeat it. Reduced motion keeps the number stationary.
+For a counter, return `{ feedback: { durationMs: 900, number: state.count } }`
+from the increment reaction. Reset can return `null`.
+
+Accepted reactions overlap by default: voice names are scoped to each accepted
+event. Set `feedback.audioMode: 'replace'` to reuse named voices on the same placed
+object and floor; a new command cancels pending and playing audio for those voices.
+Other objects remain independent. State-driven `audio` timelines also replace
+matching named voices. The host's shared twelve-voice
+budget and background cancellation still apply. Use `interaction.bump` to invoke
+a declared participant action from movement; keep any desired rate limit in the
+action itself. Bumps use normal blocked-item collision feedback and repeat with
+held movement. Action permissions remain independent of scene-edit permission.
+Up to eight bump requests can await acknowledgement; earlier
+requests or sound tails do not lock subsequent contacts.
+
+### Immediate tap/bump feedback
+
+Declare `interactionFeedback` keyed by a participant action named in `interaction`:
+
+```ts
+const contact = {
+  durationMs: 600,
+  audioMode: 'replace', // Omit or use 'overlap' to retain separate tails.
+  burstMode: 'replace', // Restart this object's burst on each contact.
+  burst: { color: '#a9e8ff', radiusCells: 1.5, particles: 0 },
+  audio: [{ kind: 'play', voice: 'ring', sound: 'bell', delayMs: 0,
+    gain: 1, rate: 1, loop: false, rangeCells: [1, 8], stereo: 0.7 }],
+} satisfies GizmoInteractionFeedback;
+// On the definition:
+interaction: { bump: { name: 'ring', payload: {} } },
+interactionFeedback: { ring: contact },
+react: () => ({ feedback: contact }),
+```
+
+Import `GizmoInteractionFeedback` from the SDK. The declaration is static JSON,
+limited to `durationMs`, `audioMode`, `audio`, `burstMode` and `burst`. Supply audio,
+a burst, or both; provided audio arrays must be nonempty. Existing burst/audio
+limits apply; all audio commands have `delayMs: 0`. The host resolves names from the
+current `sounds` or `soundBank`, prepares nearby assets and uses its protected
+browser/native output. It drops local playback that cannot start within 120 ms.
+This capability supports participant tap/bump actions, not editor/remover actions,
+configuration controls, reducers, random outcomes or state changes.
+
+Contact feedback acknowledges an attempt and may play even if the server later
+rejects it. No reducer runs speculatively. The server still validates and commits
+the action; declare its shared sound separately in `react`. Reuse the same voice
+names for contact audio: the initiating host suppresses only those names in the
+matching confirmed event, through either HTTP or realtime delivery. Give confirmed
+result sounds different voice names. Matching contact bursts are also suppressed
+on confirmation; distinct burst recipes or durations remain confirmed results.
+`burstMode: 'replace'` restarts the current burst on the same object/floor and
+disposes its previous geometry/materials; the default is `overlap`. Reduced
+motion, hidden-page, removal and floor cleanup apply to contact bursts.
+A tap/bump timestamp older than one second (or more than one second ahead of the
+server clock) removes declared contact voices and matching bursts before broadcast,
+without discarding the action or distinct confirmed results.
+
+Rapid contact feedback continues locally even at the existing eight-request cap;
+that cap still bounds submitted interaction actions. Sounds are best effort,
+including when muted, blocked, hidden, removed or waiting for audio activation.
+Chime opts into replacement. Piano, step feedback, soundboard and ambience retain
+their existing behavior. Package publication and compatible host rollout are
+required before using this new source capability in installed releases.
+
 ## Linking and same-floor travel
 
 `link: { size: 2 }` asks Scape to group placements of the same definition/version
@@ -373,6 +463,39 @@ recipe in tests; it supplies an unlinked context by default.
 [Portal](https://developer.scape.wtf/gizmos/movement) combines these primitives.
 [Jump pad](https://developer.scape.wtf/examples/gizmos/jump-pad) uses offset travel without
 linking, special artwork, sound or glow. Both use the same Scape movement system.
+
+### Character motion and consecutive travel
+
+`GizmoTravel.activateOnArrival: true` triggers only after the player steps or
+lands onto the source cell. Set `walkable: true` to allow the approach step; the
+first jump begins on the pad, and arriving travel can continue the chain. It requires non-relative exits. Scape
+rechecks the landing's identity, recipe, availability and collisions after the
+previous source's cooldown and motion have completed. Removed, blocked, corrected
+or stale landings stop the chain. Movement input during flight takes effect at
+landing and leaves the automatic chain, so authored loops remain escapable. Each leg remains independently authorized;
+this flag does not bypass the 650–5000 ms travel cooldown.
+
+`GizmoTravel.motion` accepts a `GizmoCharacterMotion`: `durationMs` (100–2000)
+and 2–16 strictly ordered `GizmoCharacterFrame` values. Each frame contains:
+
+- `at`: normalized time from 0 to 1.
+- `offset`: `[x, y]` in screen-plane cells, bounded to −4…4; positive Y lifts.
+- `scale`: `[x, y]`, each bounded to 0.25…2.
+- `rotation`: screen-plane radians, bounded to ±4π.
+
+The first and last frames must be at 0 and 1 with zero offset/rotation and unit
+scale. Scape interpolates the authorized path and applies the cosmetic transforms
+to local and observed remote characters, composing them with speaking and
+interaction poses. Reduced motion snaps the path and omits transforms but retains
+travel timing. `motion` and the older `arrival` cosmetic cannot be combined.
+These are character transforms, not skeletal clips or arbitrary player control.
+
+`gizmoCharacterMotionError(value)` validates a recipe and returns an error or
+`null`. `characterMotionFrame(motion, progress)` smoothly samples a validated
+recipe, clamping progress to its endpoints. The Jump pad example demonstrates
+lift, stretch and landing compression; other projects can author their own
+bounded transforms without using its artwork or state.
+
 
 ### World picking and navigation
 
@@ -482,6 +605,146 @@ release to false; manual use then resumes.
 
 The existing [Lamp](https://developer.scape.wtf/examples/gizmos/lamp) and
 [Pressure pad](https://developer.scape.wtf/examples/gizmos/pressure-pad) demonstrate this contract.
-Repository/packed development builds include it. npm SDK publication and compatible
-host deployment are separate release steps; the currently published 0.1.1 package
-does not yet provide these additions.
+SDK 0.2.0 includes this contract. Use the matching production host and update
+existing projects to include the required project name and description.
+
+## Web content (host feature disabled)
+
+**On hold:** Disabled in the game by owner request October 9, 2026. The API and
+example below are retained for future work. No website or HTML frame or external
+opening control is available in the game while `GIZMO_WEB_FEATURE.enabled` is
+false. Existing saved gizmos remain readable.
+
+
+Return `web` from `view(state, viewer)` to display a website or static HTML inside
+Scape's existing gizmo popover. The user chooses **Open here** before any frame
+loads. **Open website** is always available for permitted URL views. Website is
+registered for save compatibility but hidden from the developer-world palette while on hold. Its source can be exported with
+`yarn sdk:starter <new-directory> --template website` from the source repository.
+SDK 0.2.0 includes the types and validators; the host feature remains disabled.
+
+```ts
+view: state => ({
+  title: 'Billiards',
+  description: '',
+  controls: [],
+  web: {
+    title: 'Billiards match',
+    url: state.matchUrl,
+    context: true,
+    data: { matchId: state.matchId },
+    actions: ['ready'],
+    rooms: { deny: ['blocked-world-id'] },
+  },
+})
+```
+
+`GizmoWebView` accepts exactly one of `url` (HTTPS, at most 2,048 characters,
+no credentials) or `html` (at most 16,384 characters). `title` is required and
+bounded to 240 characters. Static HTML supports inline CSS and data images; it
+has no scripts, external resources or bridge. It is never inserted into Scape's
+DOM. `validGizmoWebUrl`, `validGizmoWebView` and `gizmoWebRoomAllowed` expose the
+portable validators. `ObjectView.web` is checked for both bundled and uploaded
+projects, including the QuickJS boundary.
+
+URL views may opt into `context: true`. Without this, the frame receives no
+Scape messages. `data` must be an explicitly public JSON object (encoded length
+at most 8,192 characters); no private state is automatically exposed. `actions`
+contains at most 16 distinct participant action names. Scape rechecks current
+room, object, permissions and connection locks before dispatching a declared
+action through normal authoritative handling. Editor and remover actions are
+never available through the web bridge. There is one outstanding request and a
+maximum of five action starts per second per open frame; normal server limits
+also apply. Bridge errors do not include private server error details.
+
+`rooms.allow` and `rooms.deny` each accept at most 128 room IDs; deny wins and an
+empty allow list denies every room. A restricted view is unavailable outside a
+connected room. These are gizmo-authored placement restrictions enforced by the
+normal host, not a world owner's site-blocklist setting. A site can inspect the
+room ID and refuse to join a match, but this is **not a secure backend room ban**:
+browser context is unsigned and clients can fabricate it. Enforcing external
+service access needs a future audience-bound, expiring server-issued proof plus
+verification by the external backend. No room-management or banning authority
+is granted to the embedded page.
+
+### External-site bridge
+
+The external page installs this listener before its load event. Scape transfers
+a new `MessagePort` after each frame load. Verify the parent window and your
+expected Scape host origin before accepting it. Keep the allowed origins explicit
+for production, staging or a local HTTPS development host.
+
+```js
+let scapePort;
+const scapeOrigins = new Set(['https://scape.wtf']);
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || !scapeOrigins.has(event.origin) ||
+      event.data?.protocol !== 'scape.web.v1' ||
+      event.data?.type !== 'connect' || event.ports.length !== 1) return;
+  scapePort?.close();
+  scapePort = event.ports[0];
+  scapePort.onmessage = ({ data }) => {
+    if (data.protocol !== 'scape.web.v1') return;
+    if (data.type === 'context') {
+      // roomId (null outside a connected world), objectId, objectType, floor,
+      // explicitly public data, and declared action names. No player identity.
+      console.log('Scape world', data.roomId, data.objectId);
+      // Join your own backend's match here. Keep authentication on your backend.
+    }
+    if (data.type === 'result') {
+      // { id, ok, error? }; success means the declared action was accepted.
+    }
+  };
+  scapePort.start();
+});
+
+function ready() {
+  scapePort?.postMessage({
+    protocol: 'scape.web.v1', type: 'action', id: 'ready-1',
+    name: 'ready', payload: {},
+  });
+}
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    scapePort?.postMessage({ protocol: 'scape.web.v1', type: 'close' });
+  }
+});
+```
+
+`GizmoWebContext` describes the four context fields. There are no account IDs,
+player lists, room names, credentials, admission tickets, or access to parent
+DOM/native plugins. Action requests need a 1–64 character alphanumeric/underscore/
+hyphen `id`, a declared `name` and a JSON-object `payload` of at most 2,048 encoded
+characters. Malformed messages are ignored. Valid requests receive `result` with
+the same ID. Context is pushed only when it changes; state refreshes do not reload
+the game. Changing source, room, floor, object or bridge opt-in removes the old
+frame. Closing the popover, losing authority or leaving the room also disposes
+it. Hiding Scape unloads the frame; **Open here** resumes by loading it again.
+Late action outcomes cannot enter another opening.
+
+### Embedding limits
+
+External sites run with `sandbox="allow-scripts allow-forms"`, an opaque origin
+and no referrer. Scape intentionally does not grant `allow-same-origin`: a redirect
+back to Scape must never obtain Scape's DOM or storage. Cookie/login/storage-dependent
+sites may not work; embed endpoints should support a storage-independent guest
+flow. Requests from the sandbox can have Origin `null`; do not treat that value as
+trusted authentication. Ordinary websites must allow framing through their CSP
+`frame-ancestors`/`X-Frame-Options` rules. Scape cannot bypass those rules or detect
+every framing failure. A frame load event is not proof that content rendered.
+
+Popups, top navigation, downloads, fullscreen, camera, microphone, screen capture,
+geolocation, clipboard and payment APIs are not granted. The sandbox is not a CPU
+or network quota. Interactive sites can play browser audio after user interaction;
+Scape's existing voice remains separate. Installed Capacitor apps never create
+these frames, preserving the native audio-session contract; URL views offer the
+external browser link instead. Browser HTML previews are also unavailable there.
+
+External apps own their multiplayer service. A common match URL or a match key
+constructed from room/object IDs can put viewers together; Scape does not
+synchronize arbitrary pages, DOM, clicks or third-party login sessions. Escape
+inside an arbitrary cross-origin page cannot be intercepted by the parent; use
+the bridge's close message, Tab back to host controls, or tap outside the popover.
+
+Browser behavior references: [iframe sandbox and framing](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe)
+and [cross-window messages](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage).

@@ -23,3 +23,20 @@ test('participants increment; only editors reset; the count stays bounded', () =
   assert.equal(counter.valid({ count: -1 }), false);
   assert.equal(counter.valid({ count: 10000 }), false);
 });
+
+test('bumps emit the accepted total once; reset has no result animation', () => {
+  const initial = registry.create('🔢', 'counter-bump-instance');
+  assert.deepEqual(counter.interaction.bump, { name: 'increment', payload: {} });
+  const first = registry.execute(initial, counter.interaction.bump, participant);
+  const next = registry.execute(first.instance, counter.interaction.bump, participant);
+  assert.equal(first.reaction.feedback.number, 1);
+  assert.equal(next.reaction.feedback.number, 2);
+  assert.equal(
+    registry.execute(
+      next.instance,
+      { name: 'reset', payload: {} },
+      { ...participant, canEdit: true },
+    ).reaction,
+    null,
+  );
+});

@@ -30,6 +30,7 @@ export interface Admission {
 /** Signed scene geometry; never supplied by a player message. */
 /** Signed cross-floor travel geometry. */
 export interface RoomTravel {
+  activateOnArrival?: boolean;
   source: number;
   target: number;
   exits: [number, number][];

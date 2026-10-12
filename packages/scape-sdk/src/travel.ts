@@ -1,6 +1,7 @@
 import { exactKeys, jsonData, ObjectActionError, record, type ObjectDefinition } from './api.js';
 import { gizmoFeedbackError, type GizmoFeedback } from './reaction.js';
 import { resolveGizmoSounds } from './soundBank.js';
+import { gizmoCharacterMotionError, type GizmoCharacterMotion } from './characterMotion.js';
 
 /** Host-created groups are scoped to a definition/version and floor. Independent of travel. */
 export interface GizmoLink {
@@ -18,6 +19,10 @@ export interface GizmoTravel {
   /** Rotate offsets so +X follows the entering player's direction. */
   relative?: boolean;
   cooldownMs: number;
+  /** Activate after stepping or landing onto this source, instead of before entry. Requires non-relative exits. */
+  activateOnArrival?: boolean;
+  /** Animate the character along the authorized path, with authored transforms. */
+  motion?: GizmoCharacterMotion;
   feedback?: Pick<GizmoFeedback, 'durationMs' | 'audio' | 'haptic'>;
   /** Optional local-player arrival cosmetics; collision and camera remain host-owned. */
   arrival?: { durationMs: number; scale: number; trail?: { color: string; opacity: number } };
@@ -32,7 +37,16 @@ export function gizmoTravelError(
   if (value === null) return null;
   if (
     !record(value) ||
-    !exactKeys(value, ['destination', 'exits', 'relative', 'cooldownMs', 'feedback', 'arrival']) ||
+    !exactKeys(value, [
+      'destination',
+      'exits',
+      'relative',
+      'cooldownMs',
+      'feedback',
+      'arrival',
+      'activateOnArrival',
+      'motion',
+    ]) ||
     !jsonData(value)
   )
     return 'Invalid travel recipe';
@@ -59,6 +73,16 @@ export function gizmoTravelError(
     return 'Travel requires 1–9 adjacent landing offsets';
   if (value.relative !== undefined && typeof value.relative !== 'boolean')
     return 'Invalid travel orientation';
+  if (
+    (value.activateOnArrival !== undefined && typeof value.activateOnArrival !== 'boolean') ||
+    (value.activateOnArrival && value.relative)
+  )
+    return 'Arrival activation requires non-relative travel';
+  if (value.motion !== undefined) {
+    const error = gizmoCharacterMotionError(value.motion);
+    if (error) return error;
+    if (value.arrival !== undefined) return 'Choose motion or arrival cosmetics';
+  }
   if (
     !Number.isInteger(value.cooldownMs) ||
     Number(value.cooldownMs) < 650 ||

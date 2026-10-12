@@ -1,5 +1,6 @@
 export {
   defineProject,
+  validProjectMetadata,
   PROJECT_OBJECT_LIMIT,
   defineObject,
   ObjectActionError,
@@ -13,6 +14,7 @@ export {
 } from './api.js';
 export type {
   ProjectDefinition,
+  ProjectMetadata,
   ObjectInstance,
   ObjectConfiguration,
   ObjectViewer,
@@ -25,6 +27,7 @@ export type {
   ObjectDefinition,
 } from './api.js';
 export * from './presentation.js';
+export * from './web.js';
 export * from './text.js';
 export * from './audio.js';
 export * from './glow.js';
@@ -48,15 +51,22 @@ export * from './soundBank.js';
 
 export * from './sprite.js';
 
-export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction } from './reaction.js';
+export {
+  resolveGizmoReaction,
+  gizmoFeedbackError,
+  validGizmoInteraction,
+  validateGizmoInteractionFeedback,
+} from './reaction.js';
 export type {
   GizmoFeedback,
   GizmoReaction,
   GizmoReactionContext,
   GizmoInteraction,
+  GizmoInteractionFeedback,
 } from './reaction.js';
 
 export * from './travel.js';
+export * from './characterMotion.js';
 
 export * from './navigation.js';
 

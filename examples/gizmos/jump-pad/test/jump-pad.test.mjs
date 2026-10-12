@@ -14,3 +14,14 @@ test('jump pad uses offset travel without a link or Portal dependency', () => {
     y: 0,
   });
 });
+
+test('landing activation and a neutral-ended flight allow consecutive jumps', () => {
+  const recipe = resolveGizmoTravel(jumpPad, {});
+  assert.equal(recipe.activateOnArrival, true);
+  assert.ok(recipe.motion.durationMs >= recipe.cooldownMs);
+  assert.ok(recipe.motion.frames.some(frame => frame.offset[1] > 1));
+  for (const frame of [recipe.motion.frames[0], recipe.motion.frames.at(-1)]) {
+    assert.deepEqual(frame.offset, [0, 0]);
+    assert.deepEqual(frame.scale, [1, 1]);
+  }
+});

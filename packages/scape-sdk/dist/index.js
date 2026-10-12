@@ -1,5 +1,6 @@
-export { defineProject, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt, } from './api.js';
+export { defineProject, validProjectMetadata, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt, } from './api.js';
 export * from './presentation.js';
+export * from './web.js';
 export * from './text.js';
 export * from './audio.js';
 export * from './glow.js';
@@ -15,8 +16,9 @@ export * from './partials.js';
 export * from './configuration.js';
 export * from './soundBank.js';
 export * from './sprite.js';
-export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction } from './reaction.js';
+export { resolveGizmoReaction, gizmoFeedbackError, validGizmoInteraction, validateGizmoInteractionFeedback, } from './reaction.js';
 export * from './travel.js';
+export * from './characterMotion.js';
 export * from './navigation.js';
 export * from './connections.js';
 export * from './actionButtons.js';

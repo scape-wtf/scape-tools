@@ -1,5 +1,34 @@
-/** Chime owns the ring recipe and cooldown; Scape supplies shared delivery and output. */
-import { defineObject, record, requirePayload, ObjectActionError } from '@scape-wtf/sdk';
+/** Chime owns the bump action and ring recipe; Scape supplies shared delivery and output. */
+import {
+  defineObject,
+  record,
+  requirePayload,
+  type GizmoInteractionFeedback,
+} from '@scape-wtf/sdk';
+
+const ringFeedback: GizmoInteractionFeedback = {
+  durationMs: 600,
+  audioMode: 'replace',
+  burstMode: 'replace',
+  burst: {
+    color: '#a9e8ff',
+    radiusCells: 1.5,
+    particles: 0,
+  },
+  audio: [
+    {
+      kind: 'play',
+      voice: 'ring',
+      delayMs: 0,
+      sound: 'ring',
+      gain: 1,
+      rate: 1,
+      loop: false,
+      rangeCells: [1, 8],
+      stereo: 0.7,
+    },
+  ],
+};
 
 /** Chime supplies a signal recipe; Scape supplies shared delivery and output. */
 export const chime = defineObject<{ lastAt: number }>({
@@ -7,7 +36,9 @@ export const chime = defineObject<{ lastAt: number }>({
   version: 1,
   emoji: '🛎️',
   label: 'Chime',
-  hint: 'Ring for nearby players',
+  hint: 'Bump to ring for nearby players',
+  interaction: { bump: { name: 'ring', payload: {} } },
+  interactionFeedback: { ring: ringFeedback },
   initial: () => ({ lastAt: 0 }),
   valid: (state): state is { lastAt: number } =>
     record(state) &&
@@ -17,26 +48,12 @@ export const chime = defineObject<{ lastAt: number }>({
   actions: {
     ring: {
       permission: 'participant',
-      run: (state, payload, context) => {
+      run: (_state, payload, context) => {
         requirePayload(payload, []);
-        if (context.now - state.lastAt < 250)
-          throw new ObjectActionError(409, 'Let the chime ring');
         return { lastAt: context.now };
       },
     },
   },
-  view: () => ({
-    title: 'Chime',
-    description: '',
-    controls: [
-      {
-        id: 'ring',
-        label: 'Ring',
-        placement: 'action',
-        action: { name: 'ring', payload: {} },
-      },
-    ],
-  }),
   sounds: {
     ring: {
       kind: 'synth',
@@ -56,28 +73,10 @@ export const chime = defineObject<{ lastAt: number }>({
       ],
     },
   },
-  // Saved timestamps enforce timing; only this accepted-action result causes playback.
+  // Saved timestamps retain compatibility. Other players hear the accepted ring.
   react: () => ({
     feedback: {
-      durationMs: 600,
-      burst: {
-        color: '#a9e8ff',
-        radiusCells: 1.5,
-        particles: 0,
-      },
-      audio: [
-        {
-          kind: 'play',
-          voice: 'ring',
-          delayMs: 0,
-          sound: 'ring',
-          gain: 1,
-          rate: 1,
-          loop: false,
-          rangeCells: [1, 8],
-          stereo: 0.7,
-        },
-      ],
+      ...ringFeedback,
     },
   }),
 });

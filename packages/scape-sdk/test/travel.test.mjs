@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defineObject, record, resolveGizmoTravel, travelExitOffsets } from '../dist/index.js';
+import {
+  defineObject,
+  record,
+  resolveGizmoTravel,
+  travelExitOffsets,
+  characterMotionFrame,
+  gizmoCharacterMotionError,
+} from '../dist/index.js';
 import { ObjectRegistry } from '../dist/runtime.js';
 
 const recipe = { destination: { kind: 'offset', x: 4, y: 0 }, exits: [[0, 0]], cooldownMs: 650 };
@@ -79,4 +86,56 @@ test('state changes cannot introduce invalid travel and cannot modify host link 
     'host-group',
   );
   assert.equal(instance.state.x, 1);
+});
+
+const motion = {
+  durationMs: 700,
+  frames: [
+    { at: 0, offset: [0, 0], scale: [1, 1], rotation: 0 },
+    { at: 0.5, offset: [0, 2], scale: [0.8, 1.2], rotation: 0.2 },
+    { at: 1, offset: [0, 0], scale: [1, 1], rotation: 0 },
+  ],
+};
+
+test('custom character transforms and arrival activation are independently validated', () => {
+  assert.equal(gizmoCharacterMotionError(motion), null);
+  assert.deepEqual(characterMotionFrame(motion, 0.5), motion.frames[1]);
+  assert.equal(characterMotionFrame(motion, 0.25).offset[1], 1);
+  assert.deepEqual(characterMotionFrame(motion, 2), motion.frames[2]);
+  new ObjectRegistry([{ ...base, travel: () => ({ ...recipe, motion, activateOnArrival: true }) }]);
+  for (const patch of [
+    { activateOnArrival: 'yes' },
+    { activateOnArrival: true, relative: true },
+    { motion: { ...motion, durationMs: Infinity } },
+    { motion: { ...motion, frames: [] } },
+    { motion: { ...motion, frames: [motion.frames[1], motion.frames[2]] } },
+    {
+      motion: {
+        ...motion,
+        frames: [motion.frames[0], { ...motion.frames[1], at: 0 }, motion.frames[2]],
+      },
+    },
+    {
+      motion: {
+        ...motion,
+        frames: [motion.frames[0], { ...motion.frames[1], offset: [0, 5] }, motion.frames[2]],
+      },
+    },
+    { motion, arrival: { durationMs: 100, scale: 0.7 } },
+  ])
+    assert.throws(
+      () => new ObjectRegistry([{ ...base, travel: () => ({ ...recipe, ...patch }) }]),
+      /travel/,
+    );
+});
+
+test('character transforms reject sparse vectors and leave source frames unchanged', () => {
+  for (const key of ['offset', 'scale']) {
+    const malformed = structuredClone(motion);
+    delete malformed.frames[1][key][0];
+    assert.ok(gizmoCharacterMotionError(malformed));
+  }
+  const sample = characterMotionFrame(motion, 0.5);
+  sample.offset[1] = 100;
+  assert.equal(motion.frames[1].offset[1], 2);
 });

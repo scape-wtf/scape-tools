@@ -1,12 +1,22 @@
 import { exactKeys, jsonData, ObjectActionError, record } from './api.js';
 import { gizmoFeedbackError } from './reaction.js';
 import { resolveGizmoSounds } from './soundBank.js';
+import { gizmoCharacterMotionError } from './characterMotion.js';
 export const validGizmoLink = (value) => record(value) && exactKeys(value, ['size']) && value.size === 2;
 export function gizmoTravelError(value, definition, state) {
     if (value === null)
         return null;
     if (!record(value) ||
-        !exactKeys(value, ['destination', 'exits', 'relative', 'cooldownMs', 'feedback', 'arrival']) ||
+        !exactKeys(value, [
+            'destination',
+            'exits',
+            'relative',
+            'cooldownMs',
+            'feedback',
+            'arrival',
+            'activateOnArrival',
+            'motion',
+        ]) ||
         !jsonData(value))
         return 'Invalid travel recipe';
     const d = value.destination;
@@ -23,6 +33,16 @@ export function gizmoTravelError(value, definition, state) {
         return 'Travel requires 1–9 adjacent landing offsets';
     if (value.relative !== undefined && typeof value.relative !== 'boolean')
         return 'Invalid travel orientation';
+    if ((value.activateOnArrival !== undefined && typeof value.activateOnArrival !== 'boolean') ||
+        (value.activateOnArrival && value.relative))
+        return 'Arrival activation requires non-relative travel';
+    if (value.motion !== undefined) {
+        const error = gizmoCharacterMotionError(value.motion);
+        if (error)
+            return error;
+        if (value.arrival !== undefined)
+            return 'Choose motion or arrival cosmetics';
+    }
     if (!Number.isInteger(value.cooldownMs) ||
         Number(value.cooldownMs) < 650 ||
         Number(value.cooldownMs) > 5000)
