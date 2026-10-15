@@ -2,9 +2,12 @@ import { type GizmoSpriteAnimation } from './sprite.js';
 import { type ObjectDefinition } from './api.js';
 import { type GizmoAudioCommand, type GizmoSounds } from './audio.js';
 import { type GizmoLightingState } from './lighting.js';
-/** Host-observed arrival, not authority to change saved state. IDs are local to a viewer. */
+/** Host arrival feedback, not authority to change saved state. IDs are local to a viewer.
+ * Pure step callbacks may be evaluated before a predictable arrival to queue audio.
+ * The host cancels abandoned arrivals and applies visual feedback only on arrival. */
 export interface GizmoStepEvent {
     id: string;
+    /** Expected arrival as Unix epoch milliseconds. */
     at: number;
     movement: 'walk' | 'push';
 }

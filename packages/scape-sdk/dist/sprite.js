@@ -1,3 +1,4 @@
+import { spriteImageError } from './spriteImage.js';
 import { effectNumber, effectRecord } from './effectValidation.js';
 import { jsonData, ObjectActionError } from './api.js';
 const color = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
@@ -39,6 +40,7 @@ export function gizmoSpriteError(value) {
                     'size',
                     'weight',
                     'color',
+                    'png',
                 ]) ??
                     effectNumber(shape.x, 'sprite.shape.x', 0, sprite.size) ??
                     effectNumber(shape.y, 'sprite.shape.y', 0, sprite.size);
@@ -64,17 +66,24 @@ export function gizmoSpriteError(value) {
                     !color(shape.color))
                     return 'Invalid sprite text.';
             }
-            else if (shape.kind === 'rect' || shape.kind === 'marker') {
+            else if (shape.kind === 'rect' || shape.kind === 'marker' || shape.kind === 'image') {
                 error =
                     effectRecord(shape, 'sprite.shape', shape.kind === 'rect'
                         ? ['kind', 'x', 'y', 'width', 'height', 'radius', 'fill']
-                        : ['kind', 'x', 'y', 'width', 'height']) ??
+                        : shape.kind === 'image'
+                            ? ['kind', 'x', 'y', 'width', 'height', 'png']
+                            : ['kind', 'x', 'y', 'width', 'height']) ??
                         effectNumber(shape.width, 'sprite.shape.width', 1, sprite.size) ??
                         effectNumber(shape.height, 'sprite.shape.height', 1, sprite.size);
                 if (error)
                     return error;
                 if (shape.x + shape.width > sprite.size || shape.y + shape.height > sprite.size)
                     return 'Sprite rectangles must fit the canvas.';
+                if (shape.kind === 'image') {
+                    error = spriteImageError(shape.png);
+                    if (error)
+                        return error;
+                }
                 if (shape.kind === 'rect') {
                     error = effectNumber(shape.radius, 'sprite.rect.radius', 0, Math.min(shape.width, shape.height) / 2);
                     if (error)

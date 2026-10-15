@@ -1,4 +1,4 @@
-export { defineProject, validProjectMetadata, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, localObjectRandomInt, } from './api.js';
+export { defineProject, validProjectMetadata, PROJECT_OBJECT_LIMIT, defineObject, ObjectActionError, record, exactKeys, actorId, objectId, requirePayload, jsonData, boundedJsonData, localObjectRandomInt, } from './api.js';
 export type { ProjectDefinition, ProjectMetadata, ObjectInstance, ObjectConfiguration, ObjectViewer, ObjectContext, ObjectAction, ObjectControl, ObjectChoice, ObjectField, ObjectView, ObjectDefinition, } from './api.js';
 export * from './presentation.js';
 export * from './web.js';

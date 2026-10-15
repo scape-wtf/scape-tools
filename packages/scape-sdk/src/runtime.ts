@@ -20,6 +20,7 @@ import { resolveGizmoSprite } from './sprite.js';
 import { validGizmoConfiguration } from './configuration.js';
 import { resolveGizmoSounds, gizmoPreviewError, type GizmoPreview } from './soundBank.js';
 import { validObjectView } from './view.js';
+import { validGizmoWebDefinition } from './web.js';
 import { resolveGizmoPush } from './push.js';
 import { resolveGizmoLighting } from './lighting.js';
 import { validateGizmoSteps } from './step.js';
@@ -176,6 +177,15 @@ function validateDefinition(definition: ObjectDefinition): void {
     if (definition.valid(structuredClone(state)) !== true)
       throw new Error('Invalid initial gizmo state');
     resolveGizmoSignals(definition, state);
+    field = 'web';
+    if (
+      definition.web !== undefined &&
+      (!validGizmoWebDefinition(definition.web) ||
+        definition.web.actions?.some(
+          name => definition.actions[name]?.permission !== 'participant',
+        ))
+    )
+      throw new Error('Invalid developer web declaration');
     field = 'view';
     if (definition.view) {
       for (const canEdit of [false, true]) {

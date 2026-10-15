@@ -1,12 +1,20 @@
 import { ACTION_ICONS, ACTION_BUTTON_PRESETS } from './actionButtons.js';
-import { validGizmoWebView } from './web.js';
-import { exactKeys, jsonData, record, type ObjectField, type ObjectView } from './api.js';
+import {
+  boundedJsonData,
+  exactKeys,
+  jsonData,
+  record,
+  type ObjectField,
+  type ObjectView,
+} from './api.js';
 
 /** The same bounded view contract is used for bundled and uploaded definitions. */
 export function validObjectView(value: unknown): value is ObjectView {
   if (
     !record(value) ||
-    (value.web !== undefined && !validGizmoWebView(value.web)) ||
+    Object.hasOwn(value, 'web') ||
+    (value.webData !== undefined &&
+      (!record(value.webData) || !boundedJsonData(value.webData, 8192))) ||
     typeof value.title !== 'string' ||
     value.title.length > 240 ||
     typeof value.description !== 'string' ||

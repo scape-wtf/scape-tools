@@ -45,7 +45,6 @@ const label = (value: unknown) =>
 export function validGizmoConnections(value: unknown): value is GizmoConnection[] {
   return (
     Array.isArray(value) &&
-    value.length <= 8 &&
     value.every(
       c =>
         record(c) &&

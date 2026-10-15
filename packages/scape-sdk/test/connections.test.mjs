@@ -16,6 +16,19 @@ const definition = () =>
     outputs: { power: { kind: 'boolean', label: 'Power' } },
     signals: s => ({ power: s.on }),
   });
+test('BUG-226: saved connections have no fixed count cap and still reject invalid or duplicate wires', () => {
+  const connections = Array.from({ length: 256 }, (_, i) => ({
+    output: 'power',
+    target: `connected-target-${i}`,
+    input: 'power',
+  }));
+  assert.equal(validGizmoConnections(connections), true);
+  const registry = new ObjectRegistry([definition()]);
+  const instance = { ...registry.create('🟩', 'connected-source-0001'), connections };
+  assert.equal(registry.validate(JSON.parse(JSON.stringify(instance))), true);
+  assert.equal(validGizmoConnections([...connections, connections[0]]), false);
+  assert.equal(validGizmoConnections([...connections, { ...connections[0], target: 'x' }]), false);
+});
 test('SDK accepts opt-in ports and produces validated output values without leaking instances into configuration', () => {
   const d = definition(),
     r = new ObjectRegistry([d]);

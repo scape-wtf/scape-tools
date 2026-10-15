@@ -38,7 +38,7 @@ export interface GizmoSoundChoice {
 }
 /** Host-scheduled randomized ambience playlist settings. */
 export interface GizmoPlaylistAmbience {
-  /** Loop gain divided by sqrt(current audible sources); defaults to false. */
+  /** Balance a loop layer by summed squared distance gains; defaults to true. */
   normalizeSources?: boolean;
   /** Loop start coefficients in seconds per cell, each −16 to 16; defaults to zero. */
   loopPhase?: [number, number];
@@ -90,7 +90,7 @@ export type GizmoAudioCommand =
 export interface GizmoAudioTimeline {
   /** Stable key used to replace or cancel a prior timeline. */
   key: string;
-  /** Timeline start offset in milliseconds. */
+  /** Timeline start as Unix epoch milliseconds. Commands use delayMs relative to this time. */
   at: number;
   /** Commands evaluated by the host. */
   commands: GizmoAudioCommand[];

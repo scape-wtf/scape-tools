@@ -30,7 +30,11 @@ export interface GizmoAudioBus {
 export interface GizmoSequenceContext {
     /** Monotonic opportunity counter, including steps that produce no sound. */
     step: number;
-    /** Nearest-first source order; positions in world cells, with host-derived attenuation and pan. */
+    /** Nearest-first audible sources; positions in world cells.
+     * Scape supplies neutral gain (1) and pan (0) for source-local synthesis, then
+     * applies smoothly changing distance/pan to the complete dry note before bus effects.
+     * Multiplying authored gain by this gain and adding this pan remains supported.
+     */
     sources: readonly {
         x: number;
         y: number;

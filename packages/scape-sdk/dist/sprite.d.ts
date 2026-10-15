@@ -23,6 +23,15 @@ export type GizmoSpriteShape = {
     weight: 400 | 600;
     color: string;
 }
+/** Static PNG bytes encoded as base64, at most 12000 characters; no URL prefix. */
+ | {
+    kind: 'image';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    png: string;
+}
 /** The host may supply a composition marker. The recipe only chooses its rectangle. */
  | {
     kind: 'marker';

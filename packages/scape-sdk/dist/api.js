@@ -20,6 +20,67 @@ export function requirePayload(payload, keys) {
     if (!exactKeys(payload, keys))
         throw new ObjectActionError(400, 'Invalid gizmo action');
 }
+/** Validate untrusted structured-clone input without expanding shared graphs.
+ * Work is bounded by the encoded-character budget, not just nesting depth.
+ * Repeated object references and cycles are rejected before serialization.
+ */
+export function boundedJsonData(value, maxLength) {
+    if (!Number.isSafeInteger(maxLength) || maxLength < 1)
+        return false;
+    let remaining = maxLength;
+    const seen = new WeakSet();
+    const string = (text) => {
+        if (text.length > remaining)
+            return false;
+        remaining -= JSON.stringify(text).length;
+        return remaining >= 0;
+    };
+    const visit = (item, depth) => {
+        if (depth > 16 || remaining < 1)
+            return false;
+        if (item === null || typeof item === 'boolean' || typeof item === 'number') {
+            if (typeof item === 'number' && !Number.isFinite(item))
+                return false;
+            remaining -= String(item).length;
+            return remaining >= 0;
+        }
+        if (typeof item === 'string')
+            return string(item);
+        if (!Array.isArray(item) && !record(item))
+            return false;
+        if (seen.has(item))
+            return false;
+        seen.add(item);
+        remaining -= 2;
+        if (remaining < 0)
+            return false;
+        if (Array.isArray(item)) {
+            for (let index = 0; index < item.length; index++) {
+                if (index)
+                    remaining--;
+                if (!visit(item[index], depth + 1))
+                    return false;
+            }
+        }
+        else {
+            let first = true;
+            for (const key in item) {
+                if (!Object.hasOwn(item, key))
+                    continue;
+                if (!first)
+                    remaining--;
+                first = false;
+                if (!string(key))
+                    return false;
+                remaining--; // Colon.
+                if (!visit(item[key], depth + 1))
+                    return false;
+            }
+        }
+        return remaining >= 0;
+    };
+    return visit(value, 0);
+}
 /** Persistent state and action payloads must round-trip through JSON without loss. */
 export function jsonData(value, depth = 0) {
     if (depth > 16)

@@ -1,25 +1,30 @@
-# Website
+# floored website example
 
-**On hold by owner request October 9, 2026.** The game hides this example and
-disables all web popover rendering. Source and saved configuration are retained.
-The instructions below apply only after the host feature is re-enabled.
+This learning project demonstrates the generic SDK `ObjectDefinition.web`
+capability with a fixed `https://floored.app/` source. Developers can declare their
+own site in their own gizmo; Scape has no floored-specific renderer or allowlist.
 
-Place 🌐 Website in the developer-world palette, open Configure and save an HTTPS
-embed URL. Everyone opens that same address; the external application owns its
-multiplayer rooms. Use the site's embed endpoint when it offers one.
+Click/tap 🌐 floored to open the embed immediately. Delete is the only management
+action. There is no URL field, Configure action or second opening button. State is
+empty and the example requests no Scape context or gameplay bridge. The owner
+confirmed there are no old placements; configurable URL state is removed.
 
-This example owns URL validation and editor-only configuration. Scape supplies
-its popover, isolated frame, lifecycle and optional public room-context bridge.
-An empty URL shows static HTML. Source imports only `@scape-wtf/sdk`.
+Browser rendering and developer-palette access are local implementation only;
+publication/activation remain separate. Website shop distribution is still paused.
+Installed iOS opens the fixed site externally instead of creating an iframe.
+Sites must permit framing. Scape preserves the site's own origin for module loading
+and storage inside a scriptless wrapper whose CSP permits only the declared origin.
+Off-origin redirects are blocked; browser third-party storage rules still apply.
+Browser compatibility is owner-reviewed.
 
-Run `yarn sdk:starter <new-directory> --template website` from the Scape repository
-to export a kit with the locally built SDK. This capability is not yet published
-in the npm SDK. In the exported project use `yarn install`, `yarn build`,
-`yarn test` and `yarn scape gizmo dev` after the matching host is available.
+Export with `yarn sdk:starter <new-directory> --template website`, then run
+`yarn install`, `yarn build`, `yarn test` and `yarn scape gizmo dev` in that project.
+For interfaces served entirely by the gizmo, use `--template html-panel`.
 
-Sites must allow embedding. The initial sandbox runs scripts and forms without
-same-origin storage, popups or device access; cookie/login-dependent apps may
-need an embed-specific mode. Installed iOS offers the external-browser link.
-The bridge sends public room/object context, never Scape credentials. Browser
-context is not proof of room membership and cannot enforce a secure backend ban.
-See the SDK README's Web content section for the protocol and room policies.
+## App icon
+
+`src/icon.ts` bundles floored's 192px standalone web app icon from
+`app/public/icons/app/icon-192x192.png` in the floored project. PNG metadata was
+stripped without changing pixels. The definition uses the SDK's static `image`
+sprite shape, so placements and previews reuse the icon without fetching remote
+artwork. Keep 🌐 as the stable identity; the displayed name is lowercase `floored`.

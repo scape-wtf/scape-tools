@@ -1,3 +1,4 @@
+import { spriteImageError } from './spriteImage.js';
 import { effectNumber, effectRecord } from './effectValidation.js';
 import { jsonData, ObjectActionError, type ObjectDefinition } from './api.js';
 
@@ -23,6 +24,8 @@ export type GizmoSpriteShape =
       weight: 400 | 600;
       color: string;
     }
+  /** Static PNG bytes encoded as base64, at most 12000 characters; no URL prefix. */
+  | { kind: 'image'; x: number; y: number; width: number; height: number; png: string }
   /** The host may supply a composition marker. The recipe only chooses its rectangle. */
   | { kind: 'marker'; x: number; y: number; width: number; height: number };
 /** Small layered canvas drawing, rendered by the host. No URLs, HTML, shaders or renderer handles. */
@@ -80,6 +83,7 @@ export function gizmoSpriteError(value: unknown): string | null {
           'size',
           'weight',
           'color',
+          'png',
         ]) ??
         effectNumber(shape.x, 'sprite.shape.x', 0, sprite.size) ??
         effectNumber(shape.y, 'sprite.shape.y', 0, sprite.size);
@@ -104,20 +108,26 @@ export function gizmoSpriteError(value: unknown): string | null {
           !color(shape.color)
         )
           return 'Invalid sprite text.';
-      } else if (shape.kind === 'rect' || shape.kind === 'marker') {
+      } else if (shape.kind === 'rect' || shape.kind === 'marker' || shape.kind === 'image') {
         error =
           effectRecord(
             shape,
             'sprite.shape',
             shape.kind === 'rect'
               ? ['kind', 'x', 'y', 'width', 'height', 'radius', 'fill']
-              : ['kind', 'x', 'y', 'width', 'height'],
+              : shape.kind === 'image'
+                ? ['kind', 'x', 'y', 'width', 'height', 'png']
+                : ['kind', 'x', 'y', 'width', 'height'],
           ) ??
           effectNumber(shape.width, 'sprite.shape.width', 1, sprite.size) ??
           effectNumber(shape.height, 'sprite.shape.height', 1, sprite.size);
         if (error) return error;
         if (shape.x + shape.width > sprite.size || shape.y + shape.height > sprite.size)
           return 'Sprite rectangles must fit the canvas.';
+        if (shape.kind === 'image') {
+          error = spriteImageError(shape.png);
+          if (error) return error;
+        }
         if (shape.kind === 'rect') {
           error = effectNumber(
             shape.radius,

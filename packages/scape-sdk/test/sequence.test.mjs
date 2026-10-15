@@ -137,3 +137,166 @@ test('compressor knee starts at threshold, joins continuously, and supports hard
     new GizmoSequenceRenderer({ gain: 1 }).render([{ at: 0, sound }]),
   );
 });
+
+test('BUG-233: source removal fades only its dry notes while the shared bus continues', () => {
+  const long = { ...sound, duration: 1, voices: [{ ...sound.voices[0], duration: 1 }] };
+  const renderer = new GizmoSequenceRenderer({ gain: 1 });
+  const sources = [
+    { id: 'a', gain: 1, pan: 0 },
+    { id: 'b', gain: 1, pan: 0 },
+  ];
+  renderer.render([{ at: 0, sound: long, source: 'a', spatial: { gain: 1, pan: 0 } }], sources);
+  let last;
+  for (let i = 0; i < 5; i++) last = renderer.render([], sources.slice(1));
+  assert.ok(energy(last[0]) < 1e-12, 'a removed source must finish fading within 300 ms');
+  const continuing = renderer.render(
+    [{ at: N * 6, sound: long, source: 'b', spatial: { gain: 1, pan: 0 } }],
+    sources.slice(1),
+  );
+  assert.ok(energy(continuing[0]) > 0, 'the other source still plays on the same clock');
+});
+
+test('BUG-233: removing one source preserves another overlapping note and reverb', () => {
+  const long = { ...sound, duration: 1, voices: [{ ...sound.voices[0], duration: 1 }] };
+  const bus = { gain: 1, reverb: { duration: 0.35, decay: 2, seed: 4, wet: 0.3 } };
+  const mixed = new GizmoSequenceRenderer(bus),
+    reference = new GizmoSequenceRenderer(bus);
+  const event = id => ({ at: 0, sound: long, source: id, spatial: { gain: 1, pan: 0 } });
+  const spatial = [
+    { id: 'a', gain: 1, pan: 0 },
+    { id: 'b', gain: 1, pan: 0 },
+  ];
+  mixed.render([event('a'), event('b')], spatial);
+  reference.render([event('b')], spatial);
+  let output, expected;
+  for (let i = 0; i < 9; i++) {
+    output = mixed.render([], spatial.slice(1));
+    expected = reference.render([], spatial.slice(1));
+  }
+  assert.ok(energy(output[0]) > 0);
+  assert.ok(
+    output[0].every((v, i) => Math.abs(v - expected[0][i]) < 1e-7),
+    'removed source has faded; the other note and bus clock are intact',
+  );
+});
+
+test('BUG-233: spatial updates smoothly attenuate existing notes without applying initial distance twice', () => {
+  const long = { ...sound, duration: 1, voices: [{ ...sound.voices[0], duration: 1 }] };
+  const renderer = new GizmoSequenceRenderer({ gain: 1 }),
+    reference = new GizmoSequenceRenderer({ gain: 1 });
+  const event = { at: 0, sound: long, source: 'a', spatial: { gain: 0.5, pan: 0 } };
+  const initial = renderer.render([event], [{ id: 'a', gain: 0.5, pan: 0 }]),
+    dry = reference.render([{ at: 0, sound: long }]);
+  assert.ok(initial[0].every((v, i) => Math.abs(v - dry[0][i] * 0.5) < 1e-7));
+  let output, expected;
+  for (let i = 0; i < 4; i++) {
+    output = renderer.render([], [{ id: 'a', gain: 0.25, pan: 0 }]);
+    expected = reference.render([]);
+  }
+  assert.ok(output[0].every((v, i) => Math.abs(v - expected[0][i] * 0.25) < 1e-7));
+  assert.throws(() => renderer.render([], [{ id: 'a', gain: Infinity, pan: 0 }]), /spatial/);
+});
+
+test('BUG-233: a ringing source moves across stereo without restarting its note', () => {
+  const long = { ...sound, duration: 1, voices: [{ ...sound.voices[0], duration: 1, pan: 0 }] };
+  const renderer = new GizmoSequenceRenderer({ gain: 1 });
+  const initial = renderer.render(
+    [{ at: 0, sound: long, source: 'moving', spatial: { gain: 1, pan: -0.6 } }],
+    [{ id: 'moving', gain: 1, pan: -0.6 }],
+  );
+  assert.ok(energy(initial[0]) > energy(initial[1]));
+  let moved;
+  for (let i = 0; i < 4; i++) moved = renderer.render([], [{ id: 'moving', gain: 1, pan: 0.6 }]);
+  const expectedRatio = ((1 + Math.sin((0.6 * Math.PI) / 2)) / Math.cos((0.6 * Math.PI) / 2)) ** 2;
+  assert.ok(
+    Math.abs(energy(moved[1]) / energy(moved[0]) - expectedRatio) < 1e-5,
+    'the final stereo position is absolute +0.6, without compounding the original pan',
+  );
+  assert.ok(moved.every(channel => channel.every(v => Number.isFinite(v) && Math.abs(v) <= 1)));
+});
+
+test('BUG-233: near-silent strike entry never boosts fixed envelope floors above the dry note', () => {
+  const quiet = {
+    kind: 'synth',
+    duration: 1,
+    voices: [
+      {
+        wave: 'sine',
+        start: 0,
+        duration: 1,
+        frequency: 440,
+        fade: [0, 0],
+        gain: [
+          { time: 0, value: 0.0001 },
+          { time: 0.003, value: 0.01, curve: 'exponential' },
+          { time: 1, value: 0.0001, curve: 'exponential' },
+        ],
+      },
+    ],
+  };
+  const renderer = new GizmoSequenceRenderer({ gain: 1 }),
+    reference = new GizmoSequenceRenderer({ gain: 1 });
+  let actual = renderer.render(
+    [{ at: 0, sound: quiet, source: 'a', spatial: { gain: 0.0012, pan: 0 } }],
+    [{ id: 'a', gain: 0.0012, pan: 0 }],
+  );
+  let dry = reference.render([{ at: 0, sound: quiet }]);
+  assert.ok(
+    actual[0].every((v, i) => Math.abs(v - dry[0][i] * 0.0012) < 1e-9),
+    'distance applies to the complete authored envelope at onset',
+  );
+  for (let block = 0; block < 5; block++) {
+    actual = renderer.render([], [{ id: 'a', gain: 1, pan: 0 }]);
+    dry = reference.render([]);
+    assert.ok(
+      energy(actual[0]) <= energy(dry[0]) * 1.000001,
+      'approaching cannot amplify a note above its authored level',
+    );
+  }
+  assert.ok(
+    actual[0].every((v, i) => Math.abs(v - dry[0][i]) < 1e-9),
+    'nearby notes reach unity distance gain',
+  );
+});
+
+for (const initial of [0, 1e-8, 0.2])
+  test(`BUG-233: spatial gain ${initial} remains bounded through movement and removal`, () => {
+    const long = { ...sound, duration: 1, voices: [{ ...sound.voices[0], duration: 1 }] };
+    const renderer = new GizmoSequenceRenderer({ gain: 1 }),
+      reference = new GizmoSequenceRenderer({ gain: 1 });
+    for (let block = 0; block < 9; block++) {
+      const spatial = block < 5 ? [{ id: 'a', gain: 1, pan: 0 }] : [];
+      const actual = renderer.render(
+        block === 0
+          ? [{ at: 0, sound: long, source: 'a', spatial: { gain: initial, pan: 0 } }]
+          : [],
+        spatial,
+      );
+      const dry = reference.render(block === 0 ? [{ at: 0, sound: long }] : []);
+      assert.ok(
+        actual[0].every((v, i) => Number.isFinite(v) && Math.abs(v) <= Math.abs(dry[0][i]) + 1e-9),
+      );
+      if (block === 8) assert.ok(energy(actual[0]) < 1e-12);
+    }
+  });
+
+test('BUG-233: complete emitter clips retain their recipe, include bounded tails and end quietly', async () => {
+  const { renderGizmoSequenceClip } = await import('../dist/sequenceRenderer.js');
+  const bus = {
+    gain: 0.7,
+    reverb: { duration: 0.3, decay: 2, seed: 5, wet: 0.2 },
+    delay: { time: 0.08, feedback: 0.2, wet: 0.1 },
+  };
+  const clip = renderGizmoSequenceClip(sound, bus),
+    reference = new GizmoSequenceRenderer(bus).render([{ at: 0, sound }]);
+  assert.ok(clip.duration > sound.duration + 0.3 && clip.duration <= 12);
+  assert.deepEqual(clip.samples[0].subarray(0, N), reference[0]);
+  assert.ok(
+    energy(clip.samples[0].subarray(Math.ceil(sound.duration * 48000), N * 3)) > 0,
+    'effect tail is retained',
+  );
+  for (const c of clip.samples) {
+    assert.equal(c[c.length - 1], 0);
+    assert.ok(c.every(v => Number.isFinite(v) && Math.abs(v) <= 1));
+  }
+});

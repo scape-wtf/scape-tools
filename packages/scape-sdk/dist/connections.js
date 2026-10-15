@@ -3,7 +3,6 @@ const name = (value) => typeof value === 'string' && /^[a-zA-Z][a-zA-Z0-9_-]{0,4
 const label = (value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 80;
 export function validGizmoConnections(value) {
     return (Array.isArray(value) &&
-        value.length <= 8 &&
         value.every(c => record(c) &&
             exactKeys(c, ['output', 'target', 'input']) &&
             name(c.output) &&

@@ -1,55 +1,24 @@
-/** Website owns the shared embed address; Scape supplies isolation, context and popover lifetime. */
-import {
-  defineObject,
-  exactKeys,
-  ObjectActionError,
-  record,
-  requirePayload,
-  validGizmoWebUrl,
-} from '@scape-wtf/sdk';
+/** Example only: each developer chooses their own fixed source in the SDK declaration. */
+import { defineObject, exactKeys, record } from '@scape-wtf/sdk';
+import { flooredIconPng } from './icon.js';
 
-export const website = defineObject<{ url: string }>({
+export const website = defineObject<Record<string, never>>({
   type: 'scape.website',
   version: 1,
   emoji: '🌐',
-  label: 'Website',
-  hint: 'open a shared website',
-  initial: () => ({ url: '' }),
-  valid: (state): state is { url: string } =>
-    record(state) && exactKeys(state, ['url']) && (state.url === '' || validGizmoWebUrl(state.url)),
-  configuration: { action: 'configure', fields: ['url'] },
-  actions: {
-    configure: {
-      permission: 'editor',
-      run: (_state, payload) => {
-        requirePayload(payload, ['url']);
-        if (payload.url !== '' && !validGizmoWebUrl(payload.url))
-          throw new ObjectActionError(400, 'Enter an HTTPS embed URL');
-        return { url: payload.url as string };
+  label: 'floored',
+  hint: 'open floored in an embedded website',
+  initial: () => ({}),
+  valid: (state): state is Record<string, never> => record(state) && exactKeys(state, []),
+  actions: {},
+  sprite: () => ({
+    size: 192,
+    layers: [
+      {
+        id: 'icon',
+        shapes: [{ kind: 'image', x: 0, y: 0, width: 192, height: 192, png: flooredIconPng }],
       },
-    },
-  },
-  view: (state, viewer) => ({
-    title: 'Website',
-    description: '',
-    web: state.url
-      ? { title: 'Shared website', url: state.url, context: true }
-      : {
-          title: 'Set up a website',
-          html: '<style>body{font:16px system-ui;padding:24px;background:#202020;color:white}</style><h1>Website</h1><p>Configure this gizmo with an HTTPS embed URL. Use the same match URL to play together.</p>',
-        },
-    fields: viewer.canEdit
-      ? [{ id: 'url', label: 'Website embed URL', value: state.url, maxLength: 2048 }]
-      : [],
-    controls: viewer.canEdit
-      ? [
-          {
-            id: 'configure',
-            label: 'Save website',
-            action: { name: 'configure', payload: {} },
-            fields: ['url'],
-          },
-        ]
-      : [],
+    ],
   }),
+  web: { title: 'floored', url: 'https://floored.app/' },
 });

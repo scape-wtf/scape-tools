@@ -10,6 +10,7 @@ export {
   objectId,
   requirePayload,
   jsonData,
+  boundedJsonData,
   localObjectRandomInt,
 } from './api.js';
 export type {

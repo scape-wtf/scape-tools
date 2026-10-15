@@ -596,10 +596,11 @@ Scape owns `ObjectInstance.connections` and `signalInputs`; author callbacks mus
 not write them. Wires reference stable placed instance IDs and remain outside
 portable configuration. Only editors of both endpoints may connect same-owner,
 same-floor items. Unsupported definitions keep inert saved connections. Hot reload
-must preserve valid connected ports. Cycles, mismatched kinds, duplicates, more
-than eight ports per direction, eight outgoing wires per item, 128 world wires,
-16-link chains, or 32 action deliveries in one propagation are rejected. The host
-also applies a 250 ms propagation budget. Failed
+must preserve valid connected ports. Connections have no fixed per-item or
+per-world count cap, and action deliveries have no fixed count cap. Existing world
+size, request size and execution budgets still apply. Cycles, mismatched kinds,
+duplicates, more than eight ports per direction and chains longer than 16 links
+are rejected. The host applies a 250 ms propagation budget. Failed
 propagation rolls back its state changes and feedback. Disconnected boolean inputs
 release to false; manual use then resumes.
 
@@ -608,143 +609,182 @@ The existing [Lamp](https://developer.scape.wtf/examples/gizmos/lamp) and
 SDK 0.2.0 includes this contract. Use the matching production host and update
 existing projects to include the required project name and description.
 
-## Web content (host feature disabled)
+## Web content
 
-**On hold:** Disabled in the game by owner request October 9, 2026. The API and
-example below are retained for future work. No website or HTML frame or external
-opening control is available in the game while `GIZMO_WEB_FEATURE.enabled` is
-false. Existing saved gizmos remain readable.
+Developers declare a fixed
+`web` source on `ObjectDefinition`. A player cannot choose a URL or replace HTML
+through configuration. The old `ObjectView.web` API is rejected. Gems, wallets,
+account credentials and general game-service calls are not exposed.
 
-
-Return `web` from `view(state, viewer)` to display a website or static HTML inside
-Scape's existing gizmo popover. The user chooses **Open here** before any frame
-loads. **Open website** is always available for permitted URL views. Website is
-registered for save compatibility but hidden from the developer-world palette while on hold. Its source can be exported with
-`yarn sdk:starter <new-directory> --template website` from the source repository.
-SDK 0.2.0 includes the types and validators; the host feature remains disabled.
+### A developer-chosen website
 
 ```ts
-view: state => ({
-  title: 'Billiards',
-  description: '',
-  controls: [],
-  web: {
-    title: 'Billiards match',
-    url: state.matchUrl,
-    context: true,
-    data: { matchId: state.matchId },
-    actions: ['ready'],
-    rooms: { deny: ['blocked-world-id'] },
-  },
-})
+defineObject<Record<string, never>>({
+  type: 'my-project.site', version: 1, emoji: '🌐', label: 'My site', hint: 'Open my site',
+  initial: () => ({}),
+  valid: (state): state is Record<string, never> => record(state) && exactKeys(state, []),
+  actions: {},
+  web: { title: 'My site', url: 'https://example.com/app' },
+});
 ```
+
+This is a generic SDK capability: each developer supplies their own HTTPS source
+in code. The Website learning project chooses `https://floored.app/` and is labelled
+floored in the developer palette. It has no configuration, no actions, and no
+public-context bridge; Delete is its only management action. There are no legacy
+configurable Website placements according to the owner, so no URL-state adapter
+or migration is retained. Website shop distribution remains paused independently.
+
+Clicking/tapping the placed gizmo opens its embed immediately in the existing
+popover. There is no second Open here button or URL-setting interface. Closing,
+changing worlds, losing authority or backgrounding unloads it. State refreshes
+cannot open or reopen a frame. After navigation or suspension, close the popover
+and tap the gizmo again. The host keeps its own source label outside the frame.
+
+### Bundled HTML interfaces
+
+The developer may supply HTML/CSS/JavaScript in the same definition instead of a
+website. No external hosting is required. Static HTML is inert by default;
+`interactive: true` explicitly enables inline JavaScript.
+
+```ts
+// Within a gizmo definition:
+web: {
+  title: 'Shared counter',
+  html: panelHtml, // A fixed, bundled document with inline CSS and JavaScript.
+  interactive: true,
+  context: true,
+  actions: ['increment'], // Must name declared participant actions.
+},
+view: state => ({
+  title: 'Counter', description: '', controls: [],
+  webData: { count: state.count }, // Explicitly public data only.
+}),
+```
+
+Each player gets a separate document. Shared state lives in authoritative gizmo
+actions; Scape does not synchronize DOM or local JavaScript variables. `webData`
+updates preserve the document and focus. Use `textContent` to render received
+values; never interpolate untrusted data into markup or script source.
+
+The 🧮 Puzzle terminal (`html-panel`) example demonstrates the complete flow,
+including a Solved output wired to a Lamp’s Power input. Its authoritative action
+validates guesses; the embedded document cannot edit wiring or invoke reset. Both examples are
+registered in the developer-world palette beside chat. Export standalone sources
+with `yarn sdk:starter <new-directory> --template website` or `--template html-panel`.
+
+### Limits and isolation
 
 `GizmoWebView` accepts exactly one of `url` (HTTPS, at most 2,048 characters,
-no credentials) or `html` (at most 16,384 characters). `title` is required and
-bounded to 240 characters. Static HTML supports inline CSS and data images; it
-has no scripts, external resources or bridge. It is never inserted into Scape's
-DOM. `validGizmoWebUrl`, `validGizmoWebView` and `gizmoWebRoomAllowed` expose the
-portable validators. `ObjectView.web` is checked for both bundled and uploaded
-projects, including the QuickJS boundary.
+no credentials) or `html` (at most 16,384 characters), plus a nonempty title up to
+240 characters. `interactive` is HTML-only. A definition cannot contain `data`;
+live public data comes from `ObjectView.webData`, an 8,192-character JSON object.
+It is delivered only when the fixed declaration opts into `context: true`.
+Up to 16 distinct participant action names may be declared. Editor and remover
+actions are rejected in web declarations and checked again at dispatch.
 
-URL views may opt into `context: true`. Without this, the frame receives no
-Scape messages. `data` must be an explicitly public JSON object (encoded length
-at most 8,192 characters); no private state is automatically exposed. `actions`
-contains at most 16 distinct participant action names. Scape rechecks current
-room, object, permissions and connection locks before dispatching a declared
-action through normal authoritative handling. Editor and remover actions are
-never available through the web bridge. There is one outstanding request and a
-maximum of five action starts per second per open frame; normal server limits
-also apply. Bridge errors do not include private server error details.
+Websites use `sandbox="allow-scripts allow-forms allow-same-origin"` inside a
+trusted, scriptless host wrapper. Its CSP restricts `frame-src` to the developer's
+fixed HTTPS origin, including redirects; Scape's own hostname and wildcard
+hostnames are rejected. This preserves the site's origin for JavaScript modules
+and its own storage without granting access to Scape. Never place developer HTML
+in that wrapper or mount the website directly with these sandbox permissions.
+Interactive HTML uses only `allow-scripts`; static HTML has an empty sandbox.
+Neither HTML mode gets `allow-same-origin`. No mode gets
+top navigation, popups, downloads, fullscreen, camera, microphone, screen capture,
+clipboard or browser payment access. Referrers are suppressed. Embedded content
+cannot access Scape's DOM, storage, credentials or native plugins.
 
-`rooms.allow` and `rooms.deny` each accept at most 128 room IDs; deny wins and an
-empty allow list denies every room. A restricted view is unavailable outside a
-connected room. These are gizmo-authored placement restrictions enforced by the
-normal host, not a world owner's site-blocklist setting. A site can inspect the
-room ID and refuse to join a match, but this is **not a secure backend room ban**:
-browser context is unsigned and clients can fabricate it. Enforcing external
-service access needs a future audience-bound, expiring server-issued proof plus
-verification by the external backend. No room-management or banning authority
-is granted to the embedded page.
+HTML's host CSP blocks network resources, fetch/XHR, external scripts/styles,
+nested frames, workers, objects, forms and media; inline CSS and data images are
+allowed. Dynamic evaluation is not enabled. This is not a CPU/memory quota or
+complete network-isolation guarantee: a document can attempt self-navigation,
+which may send an outgoing request before the host observes it. A subsequent load
+unloads the frame and revokes its bridge. Never give it secrets.
 
-### External-site bridge
+Remote sites must permit framing through their own CSP/X-Frame-Options policy.
+Storage/login-dependent sites may need a dedicated embed endpoint because browser
+third-party storage restrictions still apply. Off-origin redirects are blocked;
+use the site's final origin in the definition. Bundled HTML requests may have
+Origin `null`; that is never authentication. A load event does not prove
+the app rendered or works. Remote content can change after a gizmo release; its
+host source label is not a guarantee of reviewed content. Do not weaken isolation
+to make an incompatible site work.
 
-The external page installs this listener before its load event. Scape transfers
-a new `MessagePort` after each frame load. Verify the parent window and your
-expected Scape host origin before accepting it. Keep the allowed origins explicit
-for production, staging or a local HTTPS development host.
+Installed iOS does not create frames, preserving the native audio/plugin boundary.
+A URL gizmo opens its fixed source through the external browser on activation;
+bundled HTML reports browser-only availability. Hosts must supply explicit platform
+configuration; unconfigured hosts, including shop demo panels, fail closed.
+
+Optional `rooms.allow`/`rooms.deny` contain at most 128 room IDs each. Deny wins;
+an empty allow list denies all. These are placement restrictions, not signed
+identity, external-service authentication or a secure external-backend room ban.
+
+### Public-data bridge
+
+A new MessagePort is transferred after the initial load of each explicit opening.
+The receiving document listens before load. External sites must check their
+expected Scape origin as well as `event.source === window.parent.parent`
+(the direct parent is the trusted wrapper):
 
 ```js
-let scapePort;
-const scapeOrigins = new Set(['https://scape.wtf']);
+let port;
+const origins = new Set(['https://scape.wtf']);
 window.addEventListener('message', event => {
-  if (event.source !== window.parent || !scapeOrigins.has(event.origin) ||
-      event.data?.protocol !== 'scape.web.v1' ||
-      event.data?.type !== 'connect' || event.ports.length !== 1) return;
-  scapePort?.close();
-  scapePort = event.ports[0];
-  scapePort.onmessage = ({ data }) => {
-    if (data.protocol !== 'scape.web.v1') return;
+  if (event.source !== window.parent.parent || !origins.has(event.origin) ||
+      event.data?.protocol !== 'scape.web.v1' || event.data?.type !== 'connect' ||
+      event.ports.length !== 1) return;
+  port?.close(); port = event.ports[0];
+  port.onmessage = ({ data }) => {
+    if (data?.protocol !== 'scape.web.v1') return;
     if (data.type === 'context') {
-      // roomId (null outside a connected world), objectId, objectType, floor,
-      // explicitly public data, and declared action names. No player identity.
-      console.log('Scape world', data.roomId, data.objectId);
-      // Join your own backend's match here. Keep authentication on your backend.
+      // roomId, objectId, objectType, floor, public data and allowed action names.
+      // No player identity, wallet, credentials or private room information.
+      document.getElementById('count').textContent = String(data.data.count);
     }
     if (data.type === 'result') {
-      // { id, ok, error? }; success means the declared action was accepted.
+      // { id, ok, error? }; true means the authoritative action was accepted.
     }
   };
-  scapePort.start();
+  port.start();
 });
-
-function ready() {
-  scapePort?.postMessage({
-    protocol: 'scape.web.v1', type: 'action', id: 'ready-1',
-    name: 'ready', payload: {},
-  });
+function increment() {
+  port?.postMessage({ protocol: 'scape.web.v1', type: 'action',
+    id: 'increment-1', name: 'increment', payload: {} });
 }
 window.addEventListener('keydown', event => {
-  if (event.key === 'Escape') {
-    scapePort?.postMessage({ protocol: 'scape.web.v1', type: 'close' });
-  }
+  if (event.key === 'Escape') port?.postMessage({ protocol: 'scape.web.v1', type: 'close' });
 });
 ```
 
-`GizmoWebContext` describes the four context fields. There are no account IDs,
-player lists, room names, credentials, admission tickets, or access to parent
-DOM/native plugins. Action requests need a 1–64 character alphanumeric/underscore/
-hyphen `id`, a declared `name` and a JSON-object `payload` of at most 2,048 encoded
-characters. Malformed messages are ignored. Valid requests receive `result` with
-the same ID. Context is pushed only when it changes; state refreshes do not reload
-the game. Changing source, room, floor, object or bridge opt-in removes the old
-frame. Closing the popover, losing authority or leaving the room also disposes
-it. Hiding Scape unloads the frame; **Open here** resumes by loading it again.
-Late action outcomes cannot enter another opening.
+Bundled HTML can use its direct parent as the host without hard-coding a hosting
+origin; the self-contained example shows this. Context is public and unsigned.
+Requests need a 1–64 character alphanumeric/underscore/hyphen ID and a JSON-object
+payload of at most 2,048 encoded characters. One outstanding request and at most
+five action starts per second are allowed per opening; server limits also apply.
+The bridge rechecks source, object/session, room restrictions, participant
+permission and connection locks. Authoritative actions validate payloads. Errors
+never include private host details. Late results cannot reach another opening.
 
-### Embedding limits
+Escape inside an arbitrary remote document cannot be intercepted by the host;
+cooperating content sends `close`, or users tap outside/Tab back to host controls.
 
-External sites run with `sandbox="allow-scripts allow-forms"`, an opaque origin
-and no referrer. Scape intentionally does not grant `allow-same-origin`: a redirect
-back to Scape must never obtain Scape's DOM or storage. Cookie/login/storage-dependent
-sites may not work; embed endpoints should support a storage-independent guest
-flow. Requests from the sandbox can have Origin `null`; do not treat that value as
-trusted authentication. Ordinary websites must allow framing through their CSP
-`frame-ancestors`/`X-Frame-Options` rules. Scape cannot bypass those rules or detect
-every framing failure. A frame load event is not proof that content rendered.
-
-Popups, top navigation, downloads, fullscreen, camera, microphone, screen capture,
-geolocation, clipboard and payment APIs are not granted. The sandbox is not a CPU
-or network quota. Interactive sites can play browser audio after user interaction;
-Scape's existing voice remains separate. Installed Capacitor apps never create
-these frames, preserving the native audio-session contract; URL views offer the
-external browser link instead. Browser HTML previews are also unavailable there.
-
-External apps own their multiplayer service. A common match URL or a match key
-constructed from room/object IDs can put viewers together; Scape does not
-synchronize arbitrary pages, DOM, clicks or third-party login sessions. Escape
-inside an arbitrary cross-origin page cannot be intercepted by the parent; use
-the bridge's close message, Tab back to host controls, or tap outside the popover.
-
-Browser behavior references: [iframe sandbox and framing](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe)
+Browser references: [iframe sandbox](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe),
+[CSP frame-src](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-src)
 and [cross-window messages](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage).
+
+
+### Embedded sprite images
+
+A sprite layer may include `{ kind: 'image', x, y, width, height, png }`. `png` is
+base64 PNG bytes without a URL prefix, at most 12,000 characters. Images must be
+static, non-interlaced, 8-bit RGB/RGBA, 1–256 pixels per side, and contain only
+IHDR, IDAT and IEND chunks. Strip metadata before encoding. URLs, SVG, animated
+PNGs and other chunks are rejected. The complete sprite recipe retains its
+16,384-character JSON budget, and image rectangles must fit the canvas.
+
+The host decodes images locally, preserves layer ordering and guards late decode
+completion after texture eviction or disposal. PNG decode failures leave that
+layer's images unavailable; they do not trigger a remote request. The website
+example bundles floored's app icon this way. See the public
+[image sprite guide](https://developer.scape.wtf/gizmos/presentation#embedded-image-sprites).

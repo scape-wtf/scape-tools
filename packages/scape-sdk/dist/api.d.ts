@@ -117,8 +117,8 @@ export type ObjectField = {
 };
 /** Declarative editor content rendered inside Scape's shared popover. */
 export interface ObjectView {
-    /** Optional isolated website or static HTML rendered by the host in this popover. */
-    web?: GizmoWebView;
+    /** Explicitly public data sent to the definition's opt-in web bridge. Never include credentials. */
+    webData?: Record<string, unknown>;
     /** Visible panel title. */
     title: string;
     /** Supporting description for the current state or controls. */
@@ -160,6 +160,8 @@ export interface ObjectDefinition {
     };
     react?: (state: unknown, previous: unknown, action: ObjectAction, context: GizmoReactionContext) => GizmoReaction | null;
     view?: (state: unknown, viewer: ObjectViewer) => ObjectView;
+    /** Fixed developer-authored website or bundled HTML. Never derived from saved configuration or view state. */
+    web?: Omit<GizmoWebView, 'data'>;
     /** Editing always requires the placer and build permission; this can additionally require administration. */
     editPolicy?: 'placer' | 'placer-admin';
     textEditor?: GizmoTextEditor;
@@ -233,6 +235,11 @@ export declare function defineObject<S>(definition: Omit<ObjectDefinition, 'sign
     audio?: (state: S, previous: S) => GizmoAudioTimeline | null;
 }): ObjectDefinition;
 export declare function requirePayload(payload: Record<string, unknown>, keys: string[]): void;
+/** Validate untrusted structured-clone input without expanding shared graphs.
+ * Work is bounded by the encoded-character budget, not just nesting depth.
+ * Repeated object references and cycles are rejected before serialization.
+ */
+export declare function boundedJsonData(value: unknown, maxLength: number): boolean;
 /** Persistent state and action payloads must round-trip through JSON without loss. */
 export declare function jsonData(value: unknown, depth?: number): boolean;
 /** Local simulation randomness; connected actions always use the server context. */
