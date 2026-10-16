@@ -10,6 +10,26 @@ import {
   boundedJsonData,
 } from '../dist/index.js';
 
+test('fullscreen is an optional boolean on website, static and interactive HTML declarations', () => {
+  for (const source of [
+    { url: 'https://example.com' },
+    { html: '<p>Static</p>' },
+    { html: '<p>Interactive</p>', interactive: true },
+  ]) {
+    for (const fullscreen of [undefined, true, false]) {
+      const web = {
+        title: 'Panel',
+        ...source,
+        ...(fullscreen === undefined ? {} : { fullscreen }),
+      };
+      assert.equal(validGizmoWebDefinition(web), true);
+      assert.equal(resolveGizmoWebView({ web }, {}).fullscreen !== false, fullscreen !== false);
+    }
+    for (const fullscreen of [null, 0, 1, 'false', {}, []])
+      assert.equal(validGizmoWebDefinition({ title: 'Panel', ...source, fullscreen }), false);
+  }
+});
+
 test('web views accept bounded HTTPS or static HTML and reject ambiguous or executable URLs', () => {
   for (const url of ['https://game.example/room?id=1', 'https://game.example:8443/embed'])
     assert.equal(validGizmoWebUrl(url), true);

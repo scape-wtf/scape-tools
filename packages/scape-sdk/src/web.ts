@@ -10,6 +10,8 @@ import {
 export interface GizmoWebView {
   /** Accessible frame title. */
   title: string;
+  /** Show the host's expand/retract button. Defaults to true; this does not grant browser Fullscreen API access. */
+  fullscreen?: boolean;
   /** Absolute HTTPS embed URL. Mutually exclusive with html. */
   url?: string;
   /** HTML/CSS, at most 16,384 characters. Static unless interactive is explicitly true. */
@@ -73,6 +75,7 @@ export function validGizmoWebView(value: unknown): value is GizmoWebView {
     !record(value) ||
     !exactKeys(value, [
       'title',
+      'fullscreen',
       'url',
       'html',
       'interactive',
@@ -87,6 +90,7 @@ export function validGizmoWebView(value: unknown): value is GizmoWebView {
   )
     return false;
   if ((value.url === undefined) === (value.html === undefined)) return false;
+  if (value.fullscreen !== undefined && typeof value.fullscreen !== 'boolean') return false;
   if (value.url !== undefined && (!validGizmoWebUrl(value.url) || value.interactive !== undefined))
     return false;
   if (value.interactive !== undefined && typeof value.interactive !== 'boolean') return false;

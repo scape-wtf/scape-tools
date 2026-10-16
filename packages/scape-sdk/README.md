@@ -641,6 +641,19 @@ changing worlds, losing authority or backgrounding unloads it. State refreshes
 cannot open or reopen a frame. After navigation or suspension, close the popover
 and tap the gizmo again. The host keeps its own source label outside the frame.
 
+### Expand and retract
+
+Website and HTML panels show an Expand button by default. Set
+`web: { title, url, fullscreen: false }` (or the equivalent HTML declaration) to
+hide it. `fullscreen: true` explicitly enables the default. This option is available in SDK 0.3.1 and requires a matching host release.
+
+Expansion preserves the live document and bridge. Desktop uses a centered
+430 × 860 CSS-pixel phone-shaped panel, scaled down to fit. Mobile fills the
+available safe area while keeping Scape's top and bottom controls visible.
+Window/keyboard changes update the bounds. Retract returns to the anchored panel;
+closing/reopening starts collapsed. This host presentation option does not grant
+the embedded document access to the browser Fullscreen API.
+
 ### Bundled HTML interfaces
 
 The developer may supply HTML/CSS/JavaScript in the same definition instead of a
@@ -711,10 +724,14 @@ the app rendered or works. Remote content can change after a gizmo release; its
 host source label is not a guarantee of reviewed content. Do not weaken isolation
 to make an incompatible site work.
 
-Installed iOS does not create frames, preserving the native audio/plugin boundary.
-A URL gizmo opens its fixed source through the external browser on activation;
-bundled HTML reports browser-only availability. Hosts must supply explicit platform
-configuration; unconfigured hosts, including shop demo panels, fail closed.
+Installed iOS with embedded-web isolation version 1 uses the same anchored viewer
+for websites and bundled HTML. The native shell rejects iframe calls to app
+plugins, denies WebKit capture/motion permissions, and suspends WebKit media
+playback; Scape audio stays native. Older app binaries require an update and
+cannot enable panels through a web reload. This requires a matching native build;
+source support does not establish App Store/TestFlight availability. Hosts must
+supply explicit availability; unconfigured hosts, including shop demo panels,
+fail closed.
 
 Optional `rooms.allow`/`rooms.deny` contain at most 128 room IDs each. Deny wins;
 an empty allow list denies all. These are placement restrictions, not signed

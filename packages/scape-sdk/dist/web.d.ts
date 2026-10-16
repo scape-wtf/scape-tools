@@ -3,6 +3,8 @@ import { type ObjectDefinition, type ObjectView } from './api.js';
 export interface GizmoWebView {
     /** Accessible frame title. */
     title: string;
+    /** Show the host's expand/retract button. Defaults to true; this does not grant browser Fullscreen API access. */
+    fullscreen?: boolean;
     /** Absolute HTTPS embed URL. Mutually exclusive with html. */
     url?: string;
     /** HTML/CSS, at most 16,384 characters. Static unless interactive is explicitly true. */

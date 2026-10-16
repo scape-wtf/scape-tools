@@ -34,6 +34,7 @@ export function validGizmoWebView(value) {
     if (!record(value) ||
         !exactKeys(value, [
             'title',
+            'fullscreen',
             'url',
             'html',
             'interactive',
@@ -47,6 +48,8 @@ export function validGizmoWebView(value) {
         value.title.length > 240)
         return false;
     if ((value.url === undefined) === (value.html === undefined))
+        return false;
+    if (value.fullscreen !== undefined && typeof value.fullscreen !== 'boolean')
         return false;
     if (value.url !== undefined && (!validGizmoWebUrl(value.url) || value.interactive !== undefined))
         return false;
