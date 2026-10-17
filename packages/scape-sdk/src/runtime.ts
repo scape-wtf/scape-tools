@@ -405,6 +405,14 @@ export class ObjectRegistry {
       failure => !next.definitions.has(failure.type) && !next.emojis.has(failure.emoji),
     );
   }
+  /** Validate a replacement catalog once, retaining unrelated failures without mutating this registry. */
+  forkReplacing(definitions: readonly ObjectDefinition[]): ObjectRegistry {
+    const next = new ObjectRegistry(definitions);
+    next.disabled = this.failures().filter(
+      failure => !next.definitions.has(failure.type) && !next.emojis.has(failure.emoji),
+    );
+    return next;
+  }
   /** Copy the registry with additional definitions, preserving disabled definitions. */
   fork(additional: readonly ObjectDefinition[] = []): ObjectRegistry {
     for (const definition of additional) {

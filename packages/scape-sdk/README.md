@@ -130,6 +130,11 @@ you supply them; local tests do not authenticate anyone or prove world access.
 
 State is visible to room participants. Payloads are limited to 2 KiB, state to 32 KiB,
 and JSON depth to 16. Reducers receive cloned data; invalid results are rejected.
+For host catalog replacement, `registry.forkReplacing(definitions)` validates the
+complete replacement once and returns a separate registry. Unrelated disabled-definition
+records are retained; successfully replaced types or emojis clear their prior failures.
+Failure leaves the source registry unchanged, as does a successful replacement.
+
 Reducers must be synchronous and free of side effects. The local `ObjectRegistry` test runtime validates data
 and permissions, but does not isolate code or bound its execution time. Scape isolates uploaded Gizmo code.
 
@@ -594,7 +599,8 @@ are rejected. Event inputs may have multiple sources; they do not lock manual us
 
 Scape owns `ObjectInstance.connections` and `signalInputs`; author callbacks must
 not write them. Wires reference stable placed instance IDs and remain outside
-portable configuration. Only editors of both endpoints may connect same-owner,
+portable configuration. World owners and moderators may edit or connect items
+from different creators; participants retain own-item editing permissions. Only editors of both endpoints may connect compatible,
 same-floor items. Unsupported definitions keep inert saved connections. Hot reload
 must preserve valid connected ports. Connections have no fixed per-item or
 per-world count cap, and action deliveries have no fixed count cap. Existing world

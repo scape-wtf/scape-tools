@@ -28,6 +28,8 @@ export declare class ObjectRegistry {
     disable(definition: ObjectDefinition, message: string): void;
     /** Replace registered definitions atomically. */
     reset(definitions: readonly ObjectDefinition[]): void;
+    /** Validate a replacement catalog once, retaining unrelated failures without mutating this registry. */
+    forkReplacing(definitions: readonly ObjectDefinition[]): ObjectRegistry;
     /** Copy the registry with additional definitions, preserving disabled definitions. */
     fork(additional?: readonly ObjectDefinition[]): ObjectRegistry;
     all(): ObjectDefinition[];

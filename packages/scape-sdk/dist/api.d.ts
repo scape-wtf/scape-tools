@@ -162,7 +162,7 @@ export interface ObjectDefinition {
     view?: (state: unknown, viewer: ObjectViewer) => ObjectView;
     /** Fixed developer-authored website or bundled HTML. Never derived from saved configuration or view state. */
     web?: Omit<GizmoWebView, 'data'>;
-    /** Editing always requires the placer and build permission; this can additionally require administration. */
+    /** Participant editing requires placement and build permission; placer-admin restricts editing to world administrators. Hosts may let administrators edit any creator’s items. */
     editPolicy?: 'placer' | 'placer-admin';
     textEditor?: GizmoTextEditor;
     worldEditor?: GizmoWorldEditor;
