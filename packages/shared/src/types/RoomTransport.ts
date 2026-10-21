@@ -5,6 +5,10 @@ export const MAX_STATUS_TEXT_LENGTH = 320;
 export const CAPACITY = 100;
 export const GRID = { width: 64, height: 40 } as const;
 export const RECONNECT_MS = 15_000;
+/** Default visible stationary presence after an app/tab background transition. */
+export const AWAY_MS = 60_000;
+/** Upper bound for directory-configured Away reservations and cleanup grace. */
+export const MAX_AWAY_MS = 10 * 60_000;
 export const HEARTBEAT_MS = 10_000;
 export const MAX_TICKET_MS = 10 * 60_000;
 /** Validate a public room slug before it reaches routing or storage. */
@@ -26,6 +30,10 @@ export interface Admission {
   exp: number;
   world?: RoomWorld;
   profilePolicy?: { v: 1; locked: boolean; blocked: string[] };
+  /** Directory-issued, room-scoped identity for restoring position; never public presence. */
+  returnKey?: string;
+  /** Directory-configured reservation duration; clients cannot override it. */
+  awayMs?: number;
 }
 /** Signed scene geometry; never supplied by a player message. */
 /** Signed cross-floor travel geometry. */
@@ -73,6 +81,7 @@ export interface Player {
   y: number;
   seq: number;
   connected: boolean;
+  away?: boolean;
   profileRevision?: number;
   typingText?: string;
   voiceOn?: boolean;
@@ -88,6 +97,7 @@ export type RoomMessage =
       soundboardUnknownIds?: 'ignore';
       floors?: true;
       observer?: true;
+      away?: true;
     }
   | { type: 'snapshot'; revision: number; players: Player[] }
   | { type: 'delta'; revision: number; players: Player[]; removed: string[] }
@@ -113,6 +123,7 @@ export type ClientMessage =
   | { type: 'event'; event: RoomEvent }
   | { type: 'ack'; revision: number }
   | { type: 'ping' }
+  | { type: 'away' }
   | { type: 'leave' };
 
 /** Short-lived room connection material; never log or persist the token. */
