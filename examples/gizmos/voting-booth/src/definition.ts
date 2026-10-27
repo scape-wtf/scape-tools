@@ -134,6 +134,16 @@ export const votingBooth = defineObject<VotingState>({
   view: (state, viewer) => ({
     title: state.question,
     description: `${state.ballots.length} vote${state.ballots.length === 1 ? '' : 's'} · ${state.open ? 'Voting open' : 'Voting closed'}. One vote per device. You can change your vote. Votes are not anonymous.`,
+    // Results are native read-only rows; controls below remain voting actions.
+    items: state.choices.map((choice, i) => {
+      const votes = state.ballots.filter(ballot => ballot.choice === i).length;
+      const percent = state.ballots.length ? Math.round((votes * 100) / state.ballots.length) : 0;
+      return {
+        id: `answer-${i}`,
+        title: choice,
+        description: `${votes} vote${votes === 1 ? '' : 's'} · ${percent}%`,
+      };
+    }),
     fields:
       viewer.canEdit && !state.ballots.length
         ? [
@@ -154,7 +164,7 @@ export const votingBooth = defineObject<VotingState>({
     controls: [
       ...state.choices.map((choice, i) => ({
         id: `vote-${i}`,
-        label: `${choice} · ${state.ballots.filter(b => b.choice === i).length}`,
+        label: `Vote for ${choice}`,
         action: { name: 'vote', payload: { choice: i, round: state.round } },
         disabled: !state.open,
         pressed: state.ballots.some(b => b.voter === viewer.actorId && b.choice === i),

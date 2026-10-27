@@ -1,5 +1,7 @@
+import type { GizmoPendingFeedback, GizmoPendingContext } from './pendingFeedback.js';
 import type { ActionButton } from './actionButtons.js';
 import type { GizmoWebView } from './web.js';
+import type { GizmoMedia } from './media.js';
 import type { GizmoConnection, GizmoInput, GizmoOutput, GizmoSignals } from './connections.js';
 import type { GizmoNavigation, GizmoWorldEditor } from './navigation.js';
 import type { GizmoLink, GizmoTravel, GizmoEnvironment } from './travel.js';
@@ -92,7 +94,7 @@ export interface ObjectControl {
   icon?: 'toggle';
   /** Icon-only action row button; defaults to Scape’s media-play-filled icon. Permissions are unchanged. */
   placement?: 'action';
-  /** Save on a select change, with no separate button. All referenced fields must be selects. */
+  /** Save on a committed native change, with no separate button. Text fields require explicit submission. */
   trigger?: 'change';
   /** A local preview control resolves its action through definition.previews, never the server. */
   kind?: 'preview';
@@ -106,18 +108,74 @@ export interface ObjectChoice {
   /** Human-readable label shown in the control. */
   label: string;
 }
-/** One bounded text or select editor field in an object view. */
+/** A bounded native editor. Dates/times are calendar strings, never implicit timestamps. */
 export type ObjectField =
-  | { id: string; label: string; value: string; kind?: 'text'; maxLength: number }
-  | { id: string; label: string; value: string; kind: 'select'; options: ObjectChoice[] };
+  | {
+      id: string;
+      label: string;
+      value: string;
+      kind?: 'text';
+      maxLength: number;
+      multiline?: boolean;
+    }
+  | { id: string; label: string; value: string; kind: 'select'; options: ObjectChoice[] }
+  | { id: string; label: string; value: string; kind: 'radio'; options: ObjectChoice[] }
+  | { id: string; label: string; value: string; kind: 'date' | 'time'; min?: string; max?: string }
+  | { id: string; label: string; value: string; kind: 'color'; palette?: string[] }
+  /** Host-owned picker restricted to Scape's current scene emoji library. */
+  | { id: string; label: string; value: string; kind: 'emoji' }
+  | {
+      id: string;
+      label: string;
+      value: number;
+      kind: 'number';
+      min: number;
+      max: number;
+      step: number;
+    }
+  | {
+      id: string;
+      label: string;
+      value: number;
+      kind: 'slider';
+      min: number;
+      max: number;
+      step: number;
+    }
+  | { id: string; label: string; value: boolean; kind: 'boolean' }
+  | { id: string; label: string; value: string[]; kind: 'checklist'; options: ObjectChoice[] };
+/** One read-only native list row. All content is plain text. */
+export interface ObjectListItem {
+  id: string;
+  title: string;
+  description?: string;
+}
+/** Reference an existing native element; layout never grants action permission. */
+export type ObjectRowElement =
+  { kind: 'field' | 'control' | 'item'; id: string } | { kind: 'title' | 'description' };
+/** A bounded, responsive row. The host owns spacing, wrapping and field sizes. */
+export interface ObjectViewRow {
+  id: string;
+  /** Optional accessible group name. */
+  label?: string;
+  /** Equal shares by default, or natural content widths. Both wrap when needed. */
+  sizing?: 'equal' | 'content';
+  elements: ObjectRowElement[];
+}
 /** Declarative editor content rendered inside Scape's shared popover. */
 export interface ObjectView {
+  /** Optional rows, in display order. Unreferenced content keeps its normal layout.
+   * Public and editor-only elements remain in their respective sections.
+   */
+  rows?: ObjectViewRow[];
   /** Explicitly public data sent to the definition's opt-in web bridge. Never include credentials. */
   webData?: Record<string, unknown>;
   /** Visible panel title. */
   title: string;
   /** Supporting description for the current state or controls. */
   description: string;
+  /** Up to 32 read-only rows, rendered with native list styling. */
+  items?: ObjectListItem[];
   /** Optional editable fields. */
   fields?: ObjectField[];
   /** Actions available to the current viewer. */
@@ -131,6 +189,8 @@ export interface ObjectDefinition {
   version: number;
   /** Unique emoji identity used by Scape catalog. */
   emoji: string;
+  /** Previous catalog identities accepted for saved instances; omitted from new-placement catalogs. */
+  legacyEmojis?: string[];
   /** Short human-readable name shown in the developer and world UI. */
   label: string;
   /** Concise hint shown beside the gizmo in catalogs. */
@@ -153,6 +213,12 @@ export interface ObjectDefinition {
   interaction?: GizmoInteraction;
   /** Immediate local contact audio/bursts, keyed by participant tap/bump action name. */
   interactionFeedback?: Record<string, GizmoInteractionFeedback>;
+  /** Optional local waiting visuals for any action; acceptance/rejection restore confirmed presentation. */
+  pendingFeedback?: (
+    state: unknown,
+    action: ObjectAction,
+    context: GizmoPendingContext,
+  ) => GizmoPendingFeedback | null;
   areaRemoval?: { radiusCells: number };
   react?: (
     state: unknown,
@@ -163,6 +229,8 @@ export interface ObjectDefinition {
   view?: (state: unknown, viewer: ObjectViewer) => ObjectView;
   /** Fixed developer-authored website or bundled HTML. Never derived from saved configuration or view state. */
   web?: Omit<GizmoWebView, 'data'>;
+  /** Host-rendered live media backed by a catalogue, with editor-only shared tuning. */
+  media?: GizmoMedia;
   /** Participant editing requires placement and build permission; placer-admin restricts editing to world administrators. Hosts may let administrators edit any creator’s items. */
   editPolicy?: 'placer' | 'placer-admin';
   textEditor?: GizmoTextEditor;
@@ -244,6 +312,7 @@ export function defineObject<S>(
     | 'previews'
     | 'sprite'
     | 'react'
+    | 'pendingFeedback'
     | 'travel'
     | 'navigate'
   > & {
@@ -257,6 +326,11 @@ export function defineObject<S>(
         run: (state: S, payload: Record<string, unknown>, context: ObjectContext) => S;
       }
     >;
+    pendingFeedback?: (
+      state: S,
+      action: ObjectAction,
+      context: GizmoPendingContext,
+    ) => GizmoPendingFeedback | null;
     react?: (
       state: S,
       previous: S,

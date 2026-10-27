@@ -19,6 +19,12 @@ editor permission, stale rounds, malformed input and declarative controls. The l
 `ObjectRegistry` is the same validation runtime used by Scape; actors and permissions
 are supplied by the test and do not represent authenticated world sessions.
 
+The view uses `ObjectView.items` to display each answer as a native read-only
+result row with its vote total and percentage. Stable `answer-<index>` IDs let
+Scape update rows as votes change. Voting buttons remain separate actions;
+results stay visible when voting closes and return to zero after a reset.
+This requires a host and SDK with native list output support.
+
 The booth supports two to four answers and up to 256 voters. Votes are public state,
 with one changeable ballot per device identity. It is a casual poll, not an anonymous
 or account-unique election. Scape grants editing only to the placer with building

@@ -147,3 +147,100 @@ test('icon-first buttons accept only approved IDs or presets and explicit confir
     assert.equal(validObjectView(value), false, JSON.stringify(conflict));
   }
 });
+
+test('native output rows bound content and reject duplicate IDs, sparse rows and executable metadata', () => {
+  const output = () => ({
+    title: '',
+    description: 'First\nSecond',
+    controls: [],
+    items: [
+      { id: 'note-1', title: 'Alice', description: '<b>Hello</b>\nSecond line' },
+      { id: 'note-2', title: 'Anonymous' },
+    ],
+  });
+  assert.equal(validObjectView(output()), true);
+  assert.equal(validObjectView({ ...output(), items: [] }), true);
+  for (const mutate of [
+    v => v.items.push({ ...v.items[0] }),
+    v => (v.items[0].title = ' '),
+    v => (v.items[0].title = 'x'.repeat(241)),
+    v => (v.items[0].description = 'x'.repeat(4097)),
+    v => (v.items[0].id = '<script>'),
+    v => (v.items[0].html = '<script>bad()</script>'),
+    v => (v.items[0].action = { name: 'send' }),
+    v => (v.items = new Array(2)),
+    v => (v.items = Array.from({ length: 33 }, (_, n) => ({ id: String(n), title: 'Row' }))),
+    v =>
+      (v.items = Array.from({ length: 5 }, (_, n) => ({
+        id: String(n),
+        title: 'Row',
+        description: 'x'.repeat(4096),
+      }))),
+  ]) {
+    const v = output();
+    mutate(v);
+    assert.equal(validObjectView(v), false, String(mutate));
+  }
+});
+
+test('rows compose native elements by reference without duplicating them or accepting arbitrary layouts', () => {
+  const base = () => ({
+    ...view(),
+    items: [{ id: 'status', title: 'Ready' }],
+    rows: [
+      {
+        id: 'summary',
+        label: 'Summary',
+        elements: [{ kind: 'title' }, { kind: 'description' }, { kind: 'item', id: 'status' }],
+      },
+      {
+        id: 'form',
+        sizing: 'content',
+        elements: [
+          { kind: 'field', id: 'style' },
+          { kind: 'control', id: 'save' },
+        ],
+      },
+    ],
+  });
+  assert.equal(validObjectView(base()), true);
+  assert.equal(validObjectView({ ...base(), rows: [] }), true);
+  assert.equal(
+    validObjectView({
+      ...base(),
+      rows: [{ id: 'equal', sizing: 'equal', elements: [{ kind: 'field', id: 'style' }] }],
+    }),
+    true,
+  );
+  for (const mutate of [
+    v => v.rows.push(v.rows[0]),
+    v => v.rows[1].elements.push({ kind: 'title' }),
+    v => v.rows[1].elements.push({ kind: 'field', id: 'style' }),
+    v => (v.rows[1].elements[0].id = 'missing'),
+    v => (v.rows[1].elements[1].id = 'missing'),
+    v => (v.rows[0].elements[2].id = 'missing'),
+    v => (v.rows[0].elements[0].id = 'title'),
+    v => (v.rows[0].elements[0].kind = 'iframe'),
+    v => (v.rows[1].elements[0].width = 100),
+    v => (v.rows[1].elements[0].kind = 'row'),
+    v => (v.rows[1].elements = []),
+    v => (v.rows[1].elements = new Array(2)),
+    v => (v.rows = new Array(2)),
+    v => (v.rows[1].elements = Array.from({ length: 9 }, () => ({ kind: 'title' }))),
+    v =>
+      (v.rows = Array.from({ length: 33 }, (_, i) => ({
+        id: `row-${i}`,
+        elements: [{ kind: 'title' }],
+      }))),
+    v => (v.rows[0].id = ''),
+    v => (v.rows[0].label = ' '),
+    v => (v.rows[0].label = 'x'.repeat(241)),
+    v => (v.rows[0].sizing = 'fixed'),
+    v => (v.rows[0].style = 'position:fixed'),
+    v => (v.controls[0].trigger = 'change'),
+  ]) {
+    const invalid = base();
+    mutate(invalid);
+    assert.equal(validObjectView(invalid), false, String(mutate));
+  }
+});

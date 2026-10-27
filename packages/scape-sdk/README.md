@@ -40,9 +40,9 @@ The reducer must still validate submitted values: a UI choice never grants
 permission or replaces server validation.
 
 Omit `trigger` to submit referenced fields with an ordinary button. Set
-`trigger: 'change'` for automatic saving when a select changes; it renders no
+`trigger: 'change'` for automatic saving on committed select/date/time/color/number/boolean/slider/radio/checklist changes; it renders no
 extra Save button. Each field may belong to only one automatic control, all of
-its fields must be selects, and it cannot request confirmation or a toggle icon.
+its fields must be non-text native fields, and it cannot request confirmation or a toggle icon.
 Normal action permissions and `disabled` still apply. Scape disables the form
 while saving, restores focus afterward, and restores saved selections on failure.
 Explicit-save forms retain drafts for retry. Changed option sets invalidate an
@@ -69,6 +69,45 @@ Referenced editor fields remain under Configure; placement does not grant access
 to an action or expose its fields. `trigger: 'change'` cannot also be an action-row
 button. Action buttons use the shared icon-sized pending spinner. Existing
 `icon: 'toggle'` controls keep the switch icons and behavior above.
+
+### Native form fields
+
+| Declaration | Value and limits |
+| --- | --- |
+| `kind: 'date'` | `YYYY-MM-DD` or empty string; optional inclusive `min`/`max` in the same format, years 0001–9999 |
+| `kind: 'time'` | `HH:mm` (24-hour) or empty string; optional inclusive `min`/`max`, no overnight ranges |
+| `kind: 'emoji'` | One emoji; Scape supplies a searchable, categorized picker restricted to the game scene library. Supports committed-change autosave. |
+| `kind: 'color'` | Lowercase `#rrggbb`; optional `palette` of 1–32 unique colors, suggestions rather than a restriction |
+| `kind: 'number'` | Finite numeric value; required finite `min`, `max`, positive `step`, aligned from `min` |
+| `kind: 'slider'` | Native range with numeric value and required `min`, `max`, `step`; same validation as number |
+| `kind: 'radio'` | String chosen from 1–64 unique `options`, with native radio keyboard navigation |
+| `kind: 'checklist'` | Array of unique strings chosen from 1–64 `options`; empty selections allowed |
+| `kind: 'boolean'` | Boolean value rendered as a labelled native checkbox |
+| `kind: 'text', multiline: true` | String with preserved newlines; required `maxLength` from 1–4096 |
+
+All fields also require `id`, `label` and `value`. Existing text fields without a
+`kind` and select fields retain their string payloads. Number and boolean fields
+submit JSON numbers and booleans. Sliders submit numbers; checklists submit string arrays. Other fields submit strings. Numeric bounds
+and step are limited to JavaScript's safe-integer magnitude. Empty numeric drafts
+are invalid; the host never turns them into zero or silently clamps a draft.
+
+Dates and times are separate calendar values. The host never infers a timezone
+or converts them into a timestamp. Provide an explicit timezone field or label,
+and validate any timezone/DST interpretation in the action. Empty date/time
+values let an author model optional fields; validate required values in the action.
+`validObjectFieldValue(field, payload[field.id])` can be reused with trusted field
+schemas, but never replaces permissions or domain validation.
+
+The Event form example demonstrates all native field kinds with a timezone select.
+Sliders preview while dragging and autosave only on a committed native change. Radio
+and checklist options use the select option limits; validate any required selection
+count in your action.
+Scape owns styling, accessible labels, native picker behavior, pending locks and
+validation. Dirty drafts survive compatible updates and failed explicit saves;
+field-kind/multiline changes replace the editor, changed constraints invalidate
+stale activation, and permissions/session changes retire old controls. Palette
+choices use the shared native select alongside the full color picker. Mobile
+picker appearance and keyboard behavior are supplied by the device.
 
 ### Two-step content actions and icon IDs
 
@@ -180,6 +219,40 @@ Scape accepts up to 16 definitions and validates the entire update before activa
 Gizmos can also declare models, animation, interaction and independent audio through the
 [presentation contract](https://developer.scape.wtf/gizmos/presentation). The SDK contains the JSON types,
 validation, quaternion helpers and shared procedural sound rendering; platform rendering/output stays in Scape.
+
+### Native list output
+
+Return optional `items` from `view(state, viewer)` for read-only results in the
+shared popover. Scape uses the same title/detail hierarchy as native door lists;
+rows are semantic list items, not buttons. Descriptions and row text preserve
+line breaks (including Unicode line/paragraph separators), wrap, and render as
+plain text (no HTML or Markdown).
+
+```ts
+view: state => ({
+  title: 'Mailbox',
+  description: 'Messages for the owner.\nNewest messages appear last.',
+  items: state.notes.map(note => ({
+    id: `note-${note.id}`,
+    title: note.signature ?? 'Anonymous',
+    description: note.text,
+  })),
+  controls: [],
+})
+```
+
+The bundled Voting booth example uses this API for live vote totals and
+percentages, with voting actions kept separate from read-only results.
+
+Each `ObjectListItem` has a unique `id` (1–64 ASCII letters, digits, `_` or `-`),
+a nonblank `title` (up to 240 characters), and optional `description` (up to
+4,096 characters). A view supports up to 32 rows and 16,384 total row-text
+characters. Empty lists are hidden. Apply viewer permissions before returning
+private results, exactly as for descriptions. Existing views remain valid.
+Requires an updated host and SDK; older hosts may ignore `items`. Keep a short
+summary in `description` when supporting them. Installed immutable releases need
+a new authored release to adopt list output; a host update alone cannot convert
+existing description strings into rows.
 
 Text gizmos can declare `worldText(state)`, `textEditor` and `editPolicy`. Scape
 renders bounded plain text and reuses its anchored editor; Sign is the built-in
@@ -382,6 +455,52 @@ action itself. Bumps use normal blocked-item collision feedback and repeat with
 held movement. Action permissions remain independent of scene-edit permission.
 Up to eight bump requests can await acknowledgement; earlier
 requests or sound tails do not lock subsequent contacts.
+
+### Pending action visuals
+
+Use the optional `pendingFeedback(state, action, context)` callback to acknowledge a
+local action while awaiting the shared result. It works for world taps/bumps,
+Scape controls, and embedded controls that invoke an action through the host.
+Existing gizmos need no changes. This complements one-shot `interactionFeedback`
+and accepted `react` effects; it never changes saved state or grants permission.
+
+```ts
+// Inside a defineObject<LampState> definition:
+pendingFeedback: (_state, action) => action.name === 'toggle' ? {
+  durationMs: 3000,
+  cycleMs: 600,
+  pulse: { scale: 1.06, rotation: 0 },
+} : null,
+```
+
+`GizmoPendingFeedback` and `GizmoPendingContext` are exported types. The context's
+`now` is host wall-clock time in milliseconds, for cosmetic decisions only.
+Callbacks receive cloned confirmed state and action; return `null` to skip feedback.
+A recipe has `durationMs` (1–5000), `cycleMs` (100–2000), and either/both:
+
+- `pulse: { scale, rotation }`: scale 1–1.15 and rotation −0.15–0.15 radians,
+  usable without a model.
+- `frames: GizmoFrame[]`: 1–181 model poses, requiring `presentation`. The host
+  interpolates and repeats the cycle; match its first/last poses for a seamless loop.
+  These frames have no result number, sound, state write, or shared event.
+
+Hosts use `resolveGizmoPendingFeedback(definition, state, action, { now })` to
+clone inputs and validate each output, including its 64 KiB JSON budget. Uploaded
+projects run the callback within the existing restricted runtime budget.
+
+Scape keeps one pending visual per object, up to 32 at once. Existing action request
+limits remain independent: skipping a visual never drops a request. When the
+request completes or fails, Scape blends model poses back into the latest confirmed
+presentation over 120 ms; accepted state still drives `animate`, labels and audio.
+A visual timeout also returns to confirmed presentation without cancelling the
+request or assuming it failed. A later accepted state is still displayed normally.
+Remote state changes do not acknowledge the local attempt.
+
+Reduced motion uses a small static scale indication and confirmed model pose.
+Removal, floor/catalog/session changes, backgrounding, and inactive gameplay clear
+pending visuals. Late replies cannot revive them. No extra network requests or
+new shared-state fields are involved. Installed immutable gizmo releases only gain
+this capability when their author supplies and installs an updated release.
 
 ### Immediate tap/bump feedback
 
@@ -615,6 +734,26 @@ The existing [Lamp](https://developer.scape.wtf/examples/gizmos/lamp) and
 SDK 0.2.0 includes this contract. Use the matching production host and update
 existing projects to include the required project name and description.
 
+## Host live TV
+
+The local TV implementation adds `media: { kind: 'live-tv', field: 'channel',
+action: 'tune' }` to `ObjectDefinition`. The state field holds a nullable opaque
+catalogue ID, validated with `validGizmoMediaChannel`. The named action must have
+`permission: 'editor'` and accept that field in its payload. Declare it in
+`configuration` to retain tuning in copied drops. `editPolicy: 'placer-admin'`
+restricts tuning to world owners/moderators.
+
+Scape owns the channel browser, guide requests and video popover. The package
+cannot supply arbitrary stream URLs or combine media with `web`, `textEditor`
+or `worldEditor`. Pause, mute, expansion and favourites are local; only channel
+selection is shared. Closing the controls retains a compact world preview; personal
+pause hides that preview. Playback retires when the TV leaves view/hearing range
+or the viewer leaves the world. The host limits concurrent TV players and prioritizes
+the open TV. Volume and captions are not exposed as separate controls.
+Installed iOS uses native AVPlayer output and requires a binary containing the
+WorldTV plugin. Older binaries show an update notice with no WebKit fallback.
+This capability requires the matching SDK/host release; it is not yet published.
+
 ## Web content
 
 Developers declare a fixed
@@ -811,3 +950,52 @@ completion after texture eviction or disposal. PNG decode failures leave that
 layer's images unavailable; they do not trigger a remote request. The website
 example bundles floored's app icon this way. See the public
 [image sprite guide](https://developer.scape.wtf/gizmos/presentation#embedded-image-sprites).
+
+### Shared native rows
+
+`ObjectView.rows` optionally groups native fields, controls, list items, title and
+description. Each `ObjectViewRow` has a stable `id`, optional accessible `label`,
+`sizing: 'equal' | 'content'` (default `equal`) and `elements` references:
+
+```ts
+rows: [{ id: 'when', label: 'Date and time', elements: [
+  { kind: 'field', id: 'date' }, { kind: 'field', id: 'time' },
+] }],
+```
+
+Reference existing `field`, `control` or `item` IDs, or use `{ kind: 'title' }` /
+`{ kind: 'description' }`. Rows appear in order before ungrouped elements in each
+section. Equal shares or natural content widths both wrap on small screens.
+Omitting rows preserves the ordinary layout. Each element may appear once;
+limits are 32 rows, 1–8 elements per row, a 1–64 character identifier per row and
+an optional nonblank label of at most 240 characters. Nested rows, custom CSS,
+host actions and web panels are not supported. Automatic change controls cannot
+be referenced because they have no visible button. A color palette belongs to
+its color field.
+
+Layout does not change action permissions or payload bindings. Editor controls
+and their fields stay under Configure, even when a row also references public
+text/actions; the host splits that row by scope and omits empty sections.
+Read-only text is public. Field drafts survive compatible layout changes.
+The Event form and Lamp examples demonstrate shared fields, text and buttons.
+
+### Compatible catalog emoji changes
+
+`ObjectDefinition.legacyEmojis` optionally declares up to eight previous emoji
+identities. The registry resolves them to the same type/version while `all()`
+continues to expose only the canonical definition. Hosts reserve aliases just
+like primary identities and preserve stored instance IDs and scene emojis.
+Never use aliases to claim another installed or built-in gizmo's identity.
+A replacement must still validate every saved state and preserve walkability.
+For optional configuration fields added to a compatible state version,
+`ObjectRegistry.configuration()` fills missing values from validated `initial()`
+defaults without mutating saved state. Explicit stored values take precedence.
+
+The Walkable tile example uses 🔳 with the old 🟦 identity, accepts old empty
+state, and exposes an owner/moderator-only emoji picker. `editPolicy: 'placer-admin'`
+restricts editor actions to world administrators, even for an item's placer.
+`kind: 'emoji'` fields have `id`, `label`, `value` and `kind` only; authors cannot
+supply arbitrary choices. The SDK validates bounded emoji syntax and the Scape
+host validates submitted selections against its current scene library. Authors
+must still validate their action payload and state. Changing a picture grants
+none of that emoji's gameplay behavior.

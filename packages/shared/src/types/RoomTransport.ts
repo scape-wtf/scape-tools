@@ -63,6 +63,7 @@ export interface RoomWorld extends RoomFloorGeometry {
 /** Public player appearance metadata, separate from live identity credentials. */
 export interface RoomProfile {
   revision: number;
+  /** Empty means no emoji selection; absent imagery renders the neutral pearl. */
   emoji: string;
   avatar: string | null;
   avatarCircular: boolean;
@@ -87,9 +88,12 @@ export interface Player {
   voiceOn?: boolean;
   teleported?: boolean;
 }
+/** Movement codec v1: flags bit 0 is basement, bit 1 is teleported. */
+export type MovementPlayerWire = [id: string, seq: number, x: number, y: number, flags: number];
 export type RoomMessage =
   | {
       type: 'welcome';
+      movementCodec?: 1;
       v: 1;
       self: string;
       revision: number;
@@ -100,7 +104,13 @@ export type RoomMessage =
       away?: true;
     }
   | { type: 'snapshot'; revision: number; players: Player[] }
-  | { type: 'delta'; revision: number; players: Player[]; removed: string[] }
+  | {
+      type: 'delta';
+      revision: number;
+      players: Player[];
+      removed: string[];
+      m?: MovementPlayerWire[];
+    }
   | { type: 'profile'; id: string; profile: RoomProfile }
   | { type: 'event'; from: string; event: RoomEvent }
   | {
@@ -112,7 +122,7 @@ export type RoomMessage =
   | { type: 'pong'; now: number }
   | { type: 'lease'; expiresAt: number };
 export type ClientMessage =
-  | { type: 'authenticate'; token: string }
+  | { type: 'authenticate'; token: string; movementCodec?: 1 }
   | { type: 'renew'; token: string }
   | { type: 'move'; seq: number; x: number; y: number; teleported?: boolean; floor?: 0 | 1 }
   | { type: 'floor-travel'; seq: number; floor: 0 | 1 }

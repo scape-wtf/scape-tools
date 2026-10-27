@@ -1,3 +1,5 @@
-import { type ObjectView } from './api.js';
+import { type ObjectField, type ObjectView } from './api.js';
 /** The same bounded view contract is used for bundled and uploaded definitions. */
 export declare function validObjectView(value: unknown): value is ObjectView;
+/** Validate submitted typed values again in actions; view validation is not authorization. */
+export declare function validObjectFieldValue(field: ObjectField, value: unknown): boolean;

@@ -107,3 +107,34 @@ test('invalid payloads, state versions and oversized input cannot alter saved st
   );
   assert.deepEqual(booth.state.ballots, []);
 });
+
+test('native result rows show zero votes, changed votes, closed results and reset totals', () => {
+  let booth = create();
+  const results = () => votingBooth.view(booth.state, context()).items;
+  assert.deepEqual(results(), [
+    { id: 'answer-0', title: 'Explore', description: '0 votes · 0%' },
+    { id: 'answer-1', title: 'Play a game', description: '0 votes · 0%' },
+  ]);
+  booth = vote(booth, 0);
+  booth = vote(booth, 0, 'bob');
+  booth = vote(booth, 1, 'carol');
+  assert.equal(results()[0].description, '2 votes · 67%');
+  assert.equal(results()[1].description, '1 vote · 33%');
+  booth = vote(booth, 1);
+  assert.equal(results()[0].description, '1 vote · 33%');
+  assert.equal(results()[1].description, '2 votes · 67%');
+  const beforeClose = results();
+  booth = registry.act(
+    booth,
+    { name: 'toggle', payload: { round: booth.state.round } },
+    context('alice', true),
+  );
+  assert.deepEqual(results(), beforeClose);
+  assert.ok(votingBooth.view(booth.state, context()).controls.every(control => control.disabled));
+  booth = registry.act(
+    booth,
+    { name: 'reset', payload: { round: booth.state.round } },
+    context('alice', true),
+  );
+  assert.ok(results().every(row => row.description === '0 votes · 0%'));
+});

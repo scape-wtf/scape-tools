@@ -5,7 +5,7 @@ independent copy. Inside this example directory, run `npm run build`, `npm test`
 and `npm exec -- scape gizmo dev`. It connects to `https://scape.wtf`.
 
 An interactive lamp included in your developer world. Anyone in the
-world can switch a lamp on or off; its editor can choose Warm, Blue or Pink.
+world can switch a lamp on or off; its editor can choose Warm, Blue or Pink, or use the native color picker.
 Each placed lamp retains its own state. The lantern emoji avoids the reserved
 built-in light tile.
 
@@ -20,10 +20,12 @@ receive the example too; no local project connection is required.
 Tap the Lamp to open its popover, then use the primary switch in the action row
 to turn it on/off. Configure starts closed.
 Its placer can open the gear **Configure** action
-to choose Warm, Blue or Pink while world editing is allowed. The trash **Delete**
+to use the Custom color picker or the Warm, Blue and Pink buttons while world editing is allowed. Picker changes save automatically; each preset remains a one-click choice. The trash **Delete**
 action follows normal removal permission and requires confirmation. Escape or a
 tap outside closes the popover. Scape supplies this shared UI from the actions'
 `participant`/`editor` permissions; the example owns no DOM or deletion reducer.
+
+Existing preset values remain readable; custom colors are saved as lowercase six-digit hex. Both the world light and decorative glow use the chosen color.
 
 Edit `src/definition.ts` to change colors, controls and permissions. `src/project.ts` registers the Gizmo.
 
@@ -39,3 +41,6 @@ lamp definition is needed. See the [SDK contract](../../../packages/scape-sdk/RE
 Use the repository SDK or its packed starter until the updated SDK is published.
 
 The event inputs include optional sentence phrases (`toggle`, `turn on`, `turn off`) so the shared connection editor reads naturally. Labels and action behavior stay the same.
+
+The picker and three presets share an opt-in `content` row that wraps as needed.
+The power switch remains in the host action row.

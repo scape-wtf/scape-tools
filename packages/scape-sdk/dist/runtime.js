@@ -7,6 +7,7 @@ import { validGizmoConfiguration } from './configuration.js';
 import { resolveGizmoSounds, gizmoPreviewError } from './soundBank.js';
 import { validObjectView } from './view.js';
 import { validGizmoWebDefinition } from './web.js';
+import { validGizmoMedia, validGizmoMediaChannel } from './media.js';
 import { resolveGizmoPush } from './push.js';
 import { resolveGizmoLighting } from './lighting.js';
 import { validateGizmoSteps } from './step.js';
@@ -74,6 +75,13 @@ function validateDefinition(definition) {
             typeof definition.label !== 'string' ||
             !record(definition.actions))
             throw new Error('Invalid gizmo metadata');
+        if (definition.legacyEmojis !== undefined &&
+            (!Array.isArray(definition.legacyEmojis) ||
+                definition.legacyEmojis.length > 8 ||
+                definition.legacyEmojis.some(emoji => typeof emoji !== 'string' || !emoji || emoji.length > 16) ||
+                new Set([definition.emoji, ...definition.legacyEmojis]).size !==
+                    definition.legacyEmojis.length + 1))
+            throw new Error('Invalid legacy gizmo emojis');
         for (const [name, action] of Object.entries(definition.actions)) {
             field = `actions.${name}`;
             if (!action ||
@@ -141,6 +149,10 @@ function validateDefinition(definition) {
             (typeof definition.soundBank !== 'function' || definition.sounds || definition.ambience))
             throw new Error('Use a soundBank callback without static sounds or ambience');
         const sounds = resolveGizmoSounds(definition, state);
+        field = 'pendingFeedback';
+        if (definition.pendingFeedback !== undefined &&
+            typeof definition.pendingFeedback !== 'function')
+            throw new Error('pendingFeedback must be a callback');
         field = 'interactionFeedback';
         validateGizmoInteractionFeedback(definition, sounds);
         field = 'audio';
@@ -172,6 +184,18 @@ function validateDefinition(definition) {
             throw new Error('spin must be within -4 to 4 radians per second');
         if (definition.link)
             resolveGizmoLighting(definition, state, { linked: true });
+        field = 'media';
+        if (definition.media !== undefined) {
+            const media = definition.media;
+            if (!validGizmoMedia(media) ||
+                definition.web ||
+                definition.worldEditor ||
+                definition.textEditor ||
+                definition.actions[media.action]?.permission !== 'editor' ||
+                !record(state) ||
+                !validGizmoMediaChannel(state[media.field]))
+                throw new Error('Invalid media declaration');
+        }
         field = 'worldEditor';
         if (definition.worldEditor !== undefined) {
             const editor = definition.worldEditor;
@@ -276,13 +300,19 @@ export class ObjectRegistry {
         const types = new Set(), emojis = new Set();
         for (const definition of definitions) {
             try {
-                if (types.has(definition?.type) || emojis.has(definition?.emoji))
+                const identities = [
+                    definition?.emoji,
+                    ...(Array.isArray(definition?.legacyEmojis) ? definition.legacyEmojis.slice(0, 8) : []),
+                ];
+                if (types.has(definition?.type) || identities.some(emoji => emojis.has(emoji)))
                     throw new Error(`${definition?.type}: Duplicate gizmo registration`);
                 types.add(definition?.type);
-                emojis.add(definition?.emoji);
+                for (const emoji of identities)
+                    emojis.add(emoji);
                 validateDefinition(definition);
                 this.definitions.set(definition.type, definition);
-                this.emojis.set(definition.emoji, definition);
+                for (const emoji of identities)
+                    this.emojis.set(emoji, definition);
             }
             catch (error) {
                 if (!options.isolateInvalidDefinitions)
@@ -307,7 +337,8 @@ export class ObjectRegistry {
         if (this.definitions.get(definition.type) !== definition)
             return;
         this.definitions.delete(definition.type);
-        this.emojis.delete(definition.emoji);
+        for (const emoji of [definition.emoji, ...(definition.legacyEmojis ?? [])])
+            this.emojis.delete(emoji);
         this.recordFailure(definition, new Error(`${definition.type}: ${message}`));
     }
     /** Replace registered definitions atomically. */
@@ -326,7 +357,8 @@ export class ObjectRegistry {
     /** Copy the registry with additional definitions, preserving disabled definitions. */
     fork(additional = []) {
         for (const definition of additional) {
-            if (this.disabled.some(failure => failure.type === definition.type || failure.emoji === definition.emoji))
+            if (this.disabled.some(failure => failure.type === definition.type ||
+                [definition.emoji, ...(definition.legacyEmojis ?? [])].includes(failure.emoji)))
                 throw new Error(`${definition.type}: Duplicate gizmo registration`);
         }
         const next = new ObjectRegistry([...this.all(), ...additional]);
@@ -355,6 +387,8 @@ export class ObjectRegistry {
             const editor = definition.worldEditor;
             return ((!value.linkId || !!definition.link) &&
                 definition.valid(value.state) &&
+                (!definition.media ||
+                    (record(value.state) && validGizmoMediaChannel(value.state[definition.media.field]))) &&
                 (!editor ||
                     (record(value.state) &&
                         (value.state[editor.field] === null ||
@@ -390,10 +424,19 @@ export class ObjectRegistry {
         const fields = definition.configuration?.fields ?? (editor ? [editor.field] : undefined);
         if (!fields)
             return;
-        if (!record(instance.state) ||
-            fields.some(field => !Object.hasOwn(instance.state, field)))
+        if (!record(instance.state))
             throw new ObjectActionError(400, 'Invalid gizmo configuration fields');
-        const state = instance.state;
+        // A compatible definition may add optional configuration to old saved state.
+        // Copy missing fields from validated initial defaults without rewriting that state.
+        let state = instance.state;
+        if (fields.some(field => !Object.hasOwn(state, field))) {
+            const initial = definition.initial();
+            if (!record(initial) || !definition.valid(initial))
+                throw new ObjectActionError(400, 'Invalid gizmo configuration defaults');
+            state = { ...initial, ...state };
+        }
+        if (fields.some(field => !Object.hasOwn(state, field)))
+            throw new ObjectActionError(400, 'Invalid gizmo configuration fields');
         const configuration = {
             type: instance.type,
             version: instance.version,

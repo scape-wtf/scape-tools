@@ -4,6 +4,7 @@ import { walkableTile } from './definition.js';
 
 export default defineProject({
   name: 'Walkable tile',
-  description: 'Place a simple floor tile that players can walk across.',
+  description:
+    'Place a walkable floor tile and let world owners or moderators choose its emoji appearance.',
   objects: [walkableTile],
 });
