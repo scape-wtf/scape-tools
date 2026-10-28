@@ -69,6 +69,9 @@ Referenced editor fields remain under Configure; placement does not grant access
 to an action or expose its fields. `trigger: 'change'` cannot also be an action-row
 button. Action buttons use the shared icon-sized pending spinner. Existing
 `icon: 'toggle'` controls keep the switch icons and behavior above.
+`icon: 'tab'` uses `tab-open` while unpressed and `tab-close` while pressed,
+with the same boolean-state, field-free activation rules. Editors can put it in
+the main row with `placement: 'action'`; permissions are unchanged.
 
 ### Native form fields
 
@@ -753,6 +756,36 @@ the open TV. Volume and captions are not exposed as separate controls.
 Installed iOS uses native AVPlayer output and requires a binary containing the
 WorldTV plugin. Older binaries show an update notice with no WebKit fallback.
 This capability requires the matching SDK/host release; it is not yet published.
+
+## Host market data
+
+SDK 0.3.4 adds `market: { kind: 'solana-token', field: 'token',
+action: 'select', displayField: 'display' }`. `displayField` is optional and names
+a shared field whose value is `label` or `card`; absent values default to a price
+label. Include it in portable configuration with an initial default and an
+editor action if owners can choose permanent mini cards. The token state field contains `null` or a `GizmoMarketToken`
+with `address`, `symbol` and `name`, checked by `validGizmoMarketToken`.
+`GizmoMarket` describes the declaration; `validGizmoMarket` validates its fixed
+provider/field/action shape. `validSolanaMint` checks bounded base58 address syntax
+(it does not prove that an account exists or is a token mint). The address
+is the stable mint identity; a symbol is only a search/display label. The named
+editor action accepts `{ [field]: token }`; include that field in `configuration`
+for copied drops. `editPolicy: 'placer-admin'` limits selection to world managers.
+
+Scape supplies a native Configure search picker, deduplicated Solana-only results,
+quote details and transient world text. DEX Screener requests are shared per client,
+batched by mint and refreshed every 30 seconds for observed tickers. Search uses a
+300 ms debounce and a bounded one-minute cache. The host selects the most liquid
+usable pool, displays its source, and distinguishes stale data from unavailable
+prices. The checked time records the successful API read, not the last trade.
+
+Definitions do not receive network access, quotes, provider URLs or API keys.
+Only token selection and the optional world-display preference are saved/shared;
+prices never enter action reducers or scene
+storage. The capability cannot be combined with `web`, `media`, `textEditor` or
+`worldEditor`. Custom definitions may reuse it with another emoji and state field;
+validation remains enforced across the sandbox and authoritative host.
+Requires SDK 0.3.4 and a host release supporting the market capability.
 
 ## Web content
 

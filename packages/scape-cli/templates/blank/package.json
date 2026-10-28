@@ -8,11 +8,11 @@
     "dev": "scape gizmo dev"
   },
   "dependencies": {
-    "@scape-wtf/sdk": "0.3.3"
+    "@scape-wtf/sdk": "0.3.4"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
-    "@scape-wtf/cli": "0.1.10"
+    "@scape-wtf/cli": "0.1.11"
   },
   "scape": {
     "entry": "src/project.ts"

@@ -1,3 +1,4 @@
+import type { GizmoMarket } from './market.js';
 import type { GizmoPendingFeedback, GizmoPendingContext } from './pendingFeedback.js';
 import type { ActionButton } from './actionButtons.js';
 import type { GizmoWebView } from './web.js';
@@ -85,8 +86,8 @@ export interface ObjectControl {
     button?: ActionButton;
     /** Editor field identifiers submitted with this control. */
     fields?: string[];
-    /** Host action-row switch for a participant action without fields; requires boolean pressed state. */
-    icon?: 'toggle';
+    /** Host action-row switch or tab-open/tab-close toggle; requires boolean pressed state and no fields. */
+    icon?: 'toggle' | 'tab';
     /** Icon-only action row button; defaults to Scape’s media-play-filled icon. Permissions are unchanged. */
     placement?: 'action';
     /** Save on a committed native change, with no separate button. Text fields require explicit submission. */
@@ -252,6 +253,8 @@ export interface ObjectDefinition {
     web?: Omit<GizmoWebView, 'data'>;
     /** Host-rendered live media backed by a catalogue, with editor-only shared tuning. */
     media?: GizmoMedia;
+    /** Host-owned market picker and transient quotes; saved state holds a token reference. */
+    market?: GizmoMarket;
     /** Participant editing requires placement and build permission; placer-admin restricts editing to world administrators. Hosts may let administrators edit any creator’s items. */
     editPolicy?: 'placer' | 'placer-admin';
     textEditor?: GizmoTextEditor;

@@ -244,3 +244,24 @@ test('rows compose native elements by reference without duplicating them or acce
     assert.equal(validObjectView(invalid), false, String(mutate));
   }
 });
+
+test('tab toggles require pressed state and no fields, and support editor action-row placement', () => {
+  const control = {
+    id: 'display',
+    label: 'Mini card',
+    icon: 'tab',
+    placement: 'action',
+    pressed: false,
+    action: { name: 'display', payload: { display: 'card' } },
+  };
+  const make = overrides => ({
+    title: 'Ticker',
+    description: '',
+    controls: [{ ...control, ...overrides }],
+  });
+  assert.equal(validObjectView(make({})), true);
+  assert.equal(validObjectView(make({ pressed: true })), true);
+  assert.equal(validObjectView(make({ pressed: undefined })), false);
+  assert.equal(validObjectView(make({ fields: ['display'] })), false);
+  assert.equal(validObjectView(make({ icon: 'arbitrary' })), false);
+});

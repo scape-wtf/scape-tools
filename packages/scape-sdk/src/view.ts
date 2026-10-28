@@ -137,7 +137,7 @@ export function validObjectView(value: unknown): value is ObjectView {
             control.kind === undefined &&
             control.pressed === undefined)) &&
         (control.icon === undefined ||
-          (control.icon === 'toggle' &&
+          ((control.icon === 'toggle' || control.icon === 'tab') &&
             typeof control.pressed === 'boolean' &&
             (control.fields === undefined ||
               (Array.isArray(control.fields) && control.fields.length === 0)))) &&

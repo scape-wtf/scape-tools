@@ -1,3 +1,4 @@
+import { validGizmoMarket, validGizmoMarketToken } from './market.js';
 import { validGizmoConnections, validateGizmoConnections, resolveGizmoSignals, } from './connections.js';
 import { validGizmoWorldEditor, validGizmoWorldDestination, resolveGizmoNavigation, } from './navigation.js';
 import { validGizmoLink, resolveGizmoTravel } from './travel.js';
@@ -184,6 +185,22 @@ function validateDefinition(definition) {
             throw new Error('spin must be within -4 to 4 radians per second');
         if (definition.link)
             resolveGizmoLighting(definition, state, { linked: true });
+        field = 'market';
+        if (definition.market !== undefined) {
+            const market = definition.market;
+            if (!validGizmoMarket(market) ||
+                definition.media ||
+                definition.web ||
+                definition.worldEditor ||
+                definition.textEditor ||
+                definition.actions[market.action]?.permission !== 'editor' ||
+                !record(state) ||
+                !validGizmoMarketToken(state[market.field]) ||
+                (market.displayField !== undefined &&
+                    state[market.displayField] !== undefined &&
+                    !['label', 'card'].includes(state[market.displayField])))
+                throw new Error('Invalid market declaration');
+        }
         field = 'media';
         if (definition.media !== undefined) {
             const media = definition.media;
@@ -387,6 +404,12 @@ export class ObjectRegistry {
             const editor = definition.worldEditor;
             return ((!value.linkId || !!definition.link) &&
                 definition.valid(value.state) &&
+                (!definition.market ||
+                    (record(value.state) &&
+                        validGizmoMarketToken(value.state[definition.market.field]) &&
+                        (!definition.market.displayField ||
+                            value.state[definition.market.displayField] === undefined ||
+                            ['label', 'card'].includes(value.state[definition.market.displayField])))) &&
                 (!definition.media ||
                     (record(value.state) && validGizmoMediaChannel(value.state[definition.media.field]))) &&
                 (!editor ||
